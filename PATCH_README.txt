@@ -1,13 +1,17 @@
-Meimo patch v1.24.0-icon-user
+Meimo patch v1.24.0-icon-assets
 
-Ganti SEMUA icon dari icon-192.zip (asli, TANPA resize).
-- assets/icons/* diganti total
-- android-patches/icons/* diganti total (launcher pakai icon-512 apa adanya)
+Icon full seperti meimo_release_v1_20_0:
+  pakai @capacitor/assets (bukan copy manual ke mipmap)
+
+- resources/icon.png = icon kamu (tanpa resize)
+- npm run assets → generate adaptive icon benar
+- background icon #1E1E1E (bukan putih)
+- patch-android.sh TIDAK menimpa icon lagi
 
 Apply:
-  unzip -o meimo-patch-v1.24.0-icon-user.zip
-  git add assets/icons/ android-patches/icons/ android-patches/patch-android.sh
-  git commit -m "icons: replace all with user-provided icon-192.zip (no resize)"
+  unzip -o meimo-patch-v1.24.0-icon-assets.zip
+  git add .
+  git commit -m "fix: generate launcher icons via @capacitor/assets (full icon)"
   git push
 
-Uninstall app di HP, install APK baru.
+Uninstall app lama, install APK baru.

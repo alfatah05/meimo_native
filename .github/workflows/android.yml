@@ -43,19 +43,27 @@ jobs:
             npx cap add android
           fi
 
-      - name: Sync Capacitor
-        run: npx cap sync android
+      - name: Generate Android icons and splash (@capacitor/assets)
+        run: |
+          # resources/icon.png = source; background #1E1E1E (bukan putih)
+          npm run assets
+          echo "---- generated mipmap sample ----"
+          find android/app/src/main/res -name "ic_launcher*" | head -30
 
-      - name: Patch Android (package, icons, permissions)
+      - name: Patch Android (plugins, permissions, package — NOT icons)
         run: |
           chmod +x android-patches/patch-android.sh
           bash android-patches/patch-android.sh
 
-      - name: Verify package + icons + mic
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Verify package + mic + icons present
         run: |
           grep -n "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml
-          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           test -f android/app/src/main/java/com/meimo/app/MainActivity.java
+          # Icon harus ada (dari capacitor-assets)
+          find android/app/src/main/res -name "ic_launcher.png" | head -5
           echo "VERIFY OK"
 
       - name: Setup release signing
@@ -80,14 +88,10 @@ jobs:
             echo "======== WHAT WENT WRONG ========"
             awk '/What went wrong:/{flag=1} flag{print} /Try:/{if(flag){exit}}' /tmp/gradle-release.log || true
             echo "======== OTHER ERRORS ========"
-            grep -n "Execution failed\|Could not\|AAPT\|Signing\|keystore\|Exception:" /tmp/gradle-release.log | grep -v "Resource missing" | tail -40 || true
-            echo "======== TAIL ========"
+            grep -n "Execution failed\|Could not\|AAPT\|Signing\|Exception:" /tmp/gradle-release.log | grep -v "Resource missing" | tail -40 || true
             tail -40 /tmp/gradle-release.log
             exit "$STATUS"
           fi
-
-      - name: List outputs
-        run: find android/app/build/outputs/apk -type f -name "*.apk" -ls
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4

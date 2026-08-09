@@ -12,7 +12,8 @@
     "cap:run": "npm run prepare:www && npx cap run android",
     "android:debug": "cd android && ./gradlew assembleDebug",
     "android:release": "cd android && ./gradlew assembleRelease",
-    "android:bundle": "cd android && ./gradlew bundleRelease"
+    "android:bundle": "cd android && ./gradlew bundleRelease",
+    "assets": "capacitor-assets generate --android --assetPath resources --iconBackgroundColor '#1E1E1E' --iconBackgroundColorDark '#1E1E1E' --splashBackgroundColor '#1E1E1E' --splashBackgroundColorDark '#1E1E1E'"
   },
   "keywords": [
     "notes",
@@ -35,6 +36,7 @@
     "@capacitor/share": "^6.0.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.0"
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/assets": "^3.0.5"
   }
 }

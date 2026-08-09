@@ -23,42 +23,19 @@ for f in MeimoSystemBarsPlugin.java MeimoFileSaverPlugin.java NavigationBarPlugi
   fi
 done
 
-# --- Icons FULL (no adaptive = no safe-zone padding) ---
+# --- Icons: DI-GENERATE oleh `npm run assets` (@capacitor/assets) ---
+# Jangan overwrite mipmap manual — itu yang bikin padding putih.
+# Hanya pastikan background gelap jika file warna ada.
 RES="android/app/src/main/res"
-if [ -d "android-patches/icons" ] && [ -d "$RES" ]; then
-  # Adaptive icon = sumber "padding" di launcher. Hapus total.
-  rm -rf "$RES/mipmap-anydpi-v26" 2>/dev/null || true
-  rm -f "$RES/mipmap-anydpi-v26"/* 2>/dev/null || true
-  find "$RES" -name "ic_launcher*.xml" -delete 2>/dev/null || true
-
-  for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-    mkdir -p "$RES/mipmap-$dens"
-    SRC="android-patches/icons/ic_launcher_${dens}.png"
-    if [ -f "$SRC" ]; then
-      cp "$SRC" "$RES/mipmap-$dens/ic_launcher.png"
-      cp "$SRC" "$RES/mipmap-$dens/ic_launcher_round.png"
-      cp "$SRC" "$RES/mipmap-$dens/ic_launcher_foreground.png"
-      # hapus .webp default Capacitor jika ada
-      rm -f "$RES/mipmap-$dens/ic_launcher.webp" "$RES/mipmap-$dens/ic_launcher_round.webp" "$RES/mipmap-$dens/ic_launcher_foreground.webp" 2>/dev/null || true
-      echo "[patch] icon mipmap-$dens FULL"
-    fi
-  done
-
-  # Capacitor already ships values/ic_launcher_background.xml — JANGAN
-  # menambah color yang sama di colors.xml (Duplicate resources).
-  # Hanya update warna file resmi jika ada.
+if [ -d "$RES/values" ]; then
   mkdir -p "$RES/values"
-  # Selalu tulis background gelap (jangan putih default)
   cat > "$RES/values/ic_launcher_background.xml" << 'COLORXML'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#1E1E1E</color>
 </resources>
 COLORXML
-  echo "[patch] ic_launcher_background.xml = #1E1E1E"
-  # Jangan biarkan adaptive icon kembali (bikin "padding" aman ~18%)
-  rm -rf "$RES/mipmap-anydpi-v26" 2>/dev/null || true
-  # Pastikan colors.xml TIDAK berisi ic_launcher_background
+  # Hapus duplikat di colors.xml jika ada
   if [ -f "$RES/values/colors.xml" ] && grep -q "ic_launcher_background" "$RES/values/colors.xml"; then
     python3 - <<'PY2'
 from pathlib import Path
@@ -67,10 +44,10 @@ p = Path("android/app/src/main/res/values/colors.xml")
 t = p.read_text(encoding="utf-8")
 t2 = re.sub(r'\s*<color\s+name="ic_launcher_background"[^>]*>[^<]*</color>\s*', '\n', t)
 p.write_text(t2, encoding="utf-8")
-print("[patch] removed duplicate ic_launcher_background from colors.xml")
+print("[patch] removed duplicate color from colors.xml")
 PY2
   fi
-  echo "[patch] icons installed (legacy mipmap)"
+  echo "[patch] launcher background color #1E1E1E (icons from capacitor-assets)"
 fi
 
 MANIFEST="android/app/src/main/AndroidManifest.xml"
