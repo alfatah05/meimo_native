@@ -1,4 +1,4 @@
-package com.meimo.notes;
+package com.meimo.app;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;

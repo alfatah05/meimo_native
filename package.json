@@ -1,6 +1,6 @@
 {
   "name": "meimo",
-  "version": "1.23.22",
+  "version": "1.24.0",
   "description": "Meimo \u2014 Catatan Pribadi native (Capacitor)",
   "main": "index.html",
   "scripts": {
@@ -11,7 +11,8 @@
     "cap:open": "npx cap open android",
     "cap:run": "npm run prepare:www && npx cap run android",
     "android:debug": "cd android && ./gradlew assembleDebug",
-    "android:release": "cd android && ./gradlew assembleRelease"
+    "android:release": "cd android && ./gradlew assembleRelease",
+    "android:bundle": "cd android && ./gradlew bundleRelease"
   },
   "keywords": [
     "notes",

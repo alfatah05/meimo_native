@@ -1,5 +1,5 @@
 {
-  "appId": "com.meimo.notes",
+  "appId": "com.meimo.app",
   "appName": "Meimo",
   "webDir": "www",
   "server": {
@@ -17,14 +17,14 @@
       "splashImmersive": true
     },
     "StatusBar": {
-      "overlaysWebView": true,
+      "overlaysWebView": false,
       "style": "DARK",
       "backgroundColor": "#1E1E1E"
     }
   },
   "android": {
-    "allowMixedContent": true,
+    "allowMixedContent": false,
     "backgroundColor": "#1E1E1E",
-    "webContentsDebuggingEnabled": true
+    "webContentsDebuggingEnabled": false
   }
 }

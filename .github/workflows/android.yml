@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Android Release
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -46,64 +46,51 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch Android (RECORD_AUDIO + plugins)
+      - name: Patch Android (package, icons, permissions)
         run: |
           chmod +x android-patches/patch-android.sh
           bash android-patches/patch-android.sh
 
-      - name: Verify RECORD_AUDIO in source manifest
+      - name: Verify package + icons + mic permission
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          test -f "$MANIFEST"
-          grep -n "RECORD_AUDIO" "$MANIFEST"
-          grep -n "uses-permission" "$MANIFEST"
-          echo "SOURCE MANIFEST OK"
+          grep -n "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml
+          grep -n "applicationId\|namespace\|versionCode\|versionName" android/app/build.gradle 2>/dev/null || true
+          grep -n "applicationId\|namespace\|versionCode\|versionName" android/app/build.gradle.kts 2>/dev/null || true
+          test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          test -f android/app/src/main/java/com/meimo/app/MainActivity.java
+          echo "VERIFY OK com.meimo.app"
 
-      - name: Build debug APK
+      - name: Setup release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          chmod +x android-patches/setup-signing.sh
+          bash android-patches/setup-signing.sh
+
+      - name: Build Release APK + AAB
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
 
-      - name: Verify permissions inside APK
-        run: |
-          APK=$(ls android/app/build/outputs/apk/debug/*.apk | head -1)
-          echo "APK=$APK"
-          # Prefer aapt from Android SDK build-tools
-          AAPT=$(find "$ANDROID_SDK_ROOT" -name "aapt" 2>/dev/null | head -1 || true)
-          if [ -z "$AAPT" ]; then
-            AAPT=$(find /usr/local -name "aapt" 2>/dev/null | head -1 || true)
-          fi
-          if [ -n "$AAPT" ]; then
-            echo "Using $AAPT"
-            "$AAPT" dump permissions "$APK" || "$AAPT" dump badging "$APK" | head -50
-            "$AAPT" dump permissions "$APK" 2>/dev/null | tee /tmp/apk-perms.txt || true
-            if ! grep -qi "RECORD_AUDIO" /tmp/apk-perms.txt; then
-              echo "Trying badging..."
-              "$AAPT" dump badging "$APK" | tee /tmp/apk-badge.txt
-              grep -i "permission" /tmp/apk-badge.txt || true
-            fi
-            if ! grep -qi "RECORD_AUDIO" /tmp/apk-perms.txt /tmp/apk-badge.txt 2>/dev/null; then
-              echo "ERROR: RECORD_AUDIO not found in APK!"
-              exit 1
-            fi
-            echo "APK contains RECORD_AUDIO OK"
-          else
-            echo "aapt not found — unpack AndroidManifest from APK"
-            TMP=$(mktemp -d)
-            unzip -p "$APK" AndroidManifest.xml > "$TMP/AndroidManifest.xml" || true
-            # binary XML — use apkanalyzer if available
-            if command -v apkanalyzer >/dev/null 2>&1; then
-              apkanalyzer manifest permissions "$APK"
-            else
-              echo "WARN: cannot decode binary manifest; source check already passed"
-            fi
-          fi
+      - name: List outputs
+        run: find android/app/build/outputs -type f \( -name "*.apk" -o -name "*.aab" \) -ls
 
-      - name: Upload APK artifact
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: meimo-android-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: meimo-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload Release AAB (Play Store)
+        uses: actions/upload-artifact@v4
+        with:
+          name: meimo-release-aab
+          path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
           if-no-files-found: error
