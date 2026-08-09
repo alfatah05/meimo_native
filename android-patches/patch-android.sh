@@ -40,14 +40,29 @@ if [ -d "android-patches/icons" ] && [ -d "$RES" ]; then
     fi
   done
 
-  # Ensure colors.xml has background color (harmless if adaptive removed)
-  mkdir -p "$RES/values"
-  if [ -f "$RES/values/colors.xml" ]; then
-    if ! grep -q "ic_launcher_background" "$RES/values/colors.xml"; then
-      sed -i 's|</resources>|    <color name="ic_launcher_background">#1E1E1E</color>\n</resources>|' "$RES/values/colors.xml" || true
-    fi
-  else
-    printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources>' '    <color name="ic_launcher_background">#1E1E1E</color>' '</resources>' > "$RES/values/colors.xml"
+  # Capacitor already ships values/ic_launcher_background.xml — JANGAN
+  # menambah color yang sama di colors.xml (Duplicate resources).
+  # Hanya update warna file resmi jika ada.
+  if [ -f "$RES/values/ic_launcher_background.xml" ]; then
+    cat > "$RES/values/ic_launcher_background.xml" << 'COLORXML'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#1E1E1E</color>
+</resources>
+COLORXML
+    echo "[patch] updated ic_launcher_background.xml color"
+  fi
+  # Pastikan colors.xml TIDAK berisi ic_launcher_background
+  if [ -f "$RES/values/colors.xml" ] && grep -q "ic_launcher_background" "$RES/values/colors.xml"; then
+    python3 - <<'PY2'
+from pathlib import Path
+import re
+p = Path("android/app/src/main/res/values/colors.xml")
+t = p.read_text(encoding="utf-8")
+t2 = re.sub(r'\s*<color\s+name="ic_launcher_background"[^>]*>[^<]*</color>\s*', '\n', t)
+p.write_text(t2, encoding="utf-8")
+print("[patch] removed duplicate ic_launcher_background from colors.xml")
+PY2
   fi
   echo "[patch] icons installed (legacy mipmap)"
 fi
