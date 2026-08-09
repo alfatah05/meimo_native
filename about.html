@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<style>
+/* BUGFIX v1.19.1: aturan opt-in @view-transition ini SENGAJA inline di
+   sini (bukan di file eksternal src/css/view-transitions.css), dan
+   SENGAJA ditaruh sepaling-atas mungkin di <head>. Sebelumnya aturan ini
+   ada di dalam view-transitions.css yang posisi <link>-nya jauh di bawah
+   ~10 stylesheet lain — kalau file itu belum selesai di-fetch/parse pas
+   user buru-buru pindah halaman (terutama kunjungan pertama / cache
+   masih dingin), browser belum sempat "kenal" opt-in ini, jadi animasi
+   transisi halaman kadang dilewat begitu saja. Inline <style> dijamin
+   langsung tersedia tanpa nunggu network sama sekali, jadi animasinya
+   konsisten selalu jalan. Keyframes & style pseudo-element lain tetap di
+   view-transitions.css seperti biasa. */
+@view-transition {
+  navigation: auto;
+}
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Tentang Catatan</title>
+
+<!-- ============ PWA: Manifest, Theme Color, App Icon, Splash Screen ============ -->
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1E1E1E">
+<script>
+  // Terapkan tema tersimpan SEBELUM stylesheet dirender, supaya tidak ada
+  // kedip ke tema default — sekalian sinkronkan warna status bar
+  // (meta theme-color) dengan warna background tema tersebut. Peta warna
+  // di bawah HARUS sama dengan `swatch` di THEMES (lihat
+  // src/js/themes/theme-manager.js) & --color-bg per tema di
+  // src/css/themes.css.
+  (function () {
+    var THEME_COLORS = { light: "#FFFFFF", dark: "#17181C", sepia: "#F4ECD8", paper: "#FBFAF5", oled: "#000000" };
+    try {
+      var t = localStorage.getItem("notes-app-theme");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", THEME_COLORS[t] || THEME_COLORS.light);
+    } catch (e) {}
+  })();
+</script>
+<link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/assets/icons/icon-512.png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="apple-touch-startup-image" href="/assets/splash/splash-screen.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meimo">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/css/variables.css">
+<link rel="stylesheet" href="/src/css/themes.css">
+<link rel="stylesheet" href="/src/css/view-transitions.css">
+<link rel="stylesheet" href="/src/css/base.css">
+<link rel="stylesheet" href="/src/css/typography.css">
+<link rel="stylesheet" href="/src/css/layout.css">
+<link rel="stylesheet" href="/src/css/toolbar.css">
+<link rel="stylesheet" href="/src/css/animations.css">
+<link rel="stylesheet" href="/src/css/responsive.css">
+<link rel="stylesheet" href="/src/css/components.css">
+<link rel="stylesheet" href="/src/css/about.css">
+</head>
+<body>
+
+<div class="page">
+
+  <header class="home-header">
+    <div style="display:flex; align-items:center; gap: var(--space-sm);">
+      <a href="/library" class="note-back-btn" aria-label="Back" data-i18n-aria="nav.back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </a>
+      <div class="home-greeting" data-i18n="about.heading">About</div>
+    </div>
+  </header>
+
+  <main class="home-content">
+
+    <div class="about-hero anim-fade-in">
+      <img class="about-hero__icon" src="/assets/icons/icon-192.png" alt="Ikon aplikasi Meimo">
+      <div class="about-hero__name">Meimo</div>
+      <p class="about-hero__tagline"><span data-i18n="about.tagline">A beautiful personal notes app, rich in features, stored safely on your device.</span></p>
+    </div>
+
+    <section class="about-section">
+      <div class="about-section__title" data-i18n="about.descTitle">App description</div>
+      <p>Meimo adalah aplikasi catatan pribadi yang bisa kamu pasang di ponsel atau komputer. Semua catatan disimpan langsung di perangkatmu — tidak dikirim ke server kami — jadi isinya tetap privat dan sepenuhnya di tanganmu.</p>
+      <p>Editornya mendukung format teks modern, gambar, scene, musik, rekam suara, hingga bantuan AI. Kamu juga bisa mengganti tema, font, mencadangkan data, dan menata catatan dengan arsip atau sampah.</p>
+    </section>
+
+    <section class="about-section">
+      <div class="about-section__title" data-i18n="about.features">Main features</div>
+      <div class="about-feature-list">
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"></path>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.editor">Rich text editor</strong>: tebal, miring, garis bawah, judul, daftar, kutipan, garis pemisah, tautan, warna teks &amp; sorotan, plus font kustom.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <path d="M21 15l-5-5L5 21"></path>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.media">Images, scenes &amp; music</strong>: sisipkan gambar, blok scene berwarna, dan musik latar per bagian catatan.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"></path>
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+            <line x1="8" y1="22" x2="16" y2="22"></line>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.voice">Voice to text</strong>: rekam percakapan dan hasilnya langsung tertulis di catatan baru.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"></path>
+            <path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z"></path>
+            <path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"></path>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.ai">AI assistant</strong>: tulis atau sunting bagian catatan dengan Gemini — memakai kunci API milikmu sendiri dari halaman Fitur AI.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.theme">Themes &amp; fonts</strong>: lima tema tampilan (Terang, Gelap, Sepia, Kertas, OLED) dan pustaka font yang bisa diunduh atau diunggah.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12"></path>
+            <path d="M7 10l5 5 5-5"></path>
+            <path d="M4 19h16"></path>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.backup">Backup &amp; import</strong>: unduh semua catatan (dengan gambar/musik) sebagai file cadangan, atau impor kembali kapan saja.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.archive">Archive &amp; trash</strong>: arsipkan catatan yang jarang dibuka, atau pulihkan dari sampah sebelum dihapus permanen.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="5" y="2" width="14" height="20" rx="2"></rect>
+            <path d="M12 18h.01"></path>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.install">Installable on your device</strong>: tambahkan ke layar utama ponsel atau komputer agar terasa seperti aplikasi biasa, lengkap dengan ikon sendiri.</div>
+        </div>
+
+        <div class="about-feature">
+          <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <div class="about-feature__text"><strong data-i18n="about.feat.offline">Works offline</strong>: setelah dibuka sekali saat online, catatan dan sebagian besar fitur tetap tersedia tanpa internet. Fitur AI membutuhkan koneksi.</div>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="about-section">
+      <div class="about-section__title" data-i18n="about.contributors">Contributors</div>
+      <div class="about-creator-card">
+        <div class="about-creator-card__avatar">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4"></circle>
+            <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8"></path>
+          </svg>
+        </div>
+        <div class="about-creator-card__body">
+          <div class="about-creator-card__name">Nabil Alfatah</div>
+          <div class="about-creator-card__social">
+            <a class="about-social-btn" href="https://github.com/placeholder" target="_blank" rel="noopener noreferrer" aria-label="GitHub kontributor">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.523 2 12 2z"/></svg>
+            </a>
+            <a class="about-social-btn" href="https://instagram.com/placeholder" target="_blank" rel="noopener noreferrer" aria-label="Instagram kontributor">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="about-footer-note">
+      <span>Meimo, Catatan Pribadi</span>
+      <span class="about-footer-note__sep" aria-hidden="true">·</span>
+      <a href="/privacy-policy" class="about-footer-note__link" data-i18n="about.privacy">Privacy Policy</a>
+    </div>
+
+  </main>
+
+</div>
+
+<script type="module">
+  import { initI18n, t } from "/src/js/i18n/i18n.js";
+  initI18n();
+  document.title = t("title.about");
+</script>
+<script type="module" src="/src/js/pwa/sw-register.js"></script>
+<script type="module" src="/src/js/pwa/install-prompt.js"></script>
+<script type="module" src="/src/js/utils/native-feel.js"></script>
+<script type="module" src="/src/js/pwa/factory-reset.js"></script>
+
+</body>
+</html>

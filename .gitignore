@@ -1,0 +1,11 @@
+node_modules/
+android/
+ios/
+.idea/
+*.iml
+.DS_Store
+dist/
+.capacitor/
+*.log
+.npm/
+package-lock.json

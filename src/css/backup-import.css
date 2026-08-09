@@ -1,0 +1,64 @@
+/**
+ * backup-import.css
+ * Styling khusus halaman cadangkan.html — dua tombol aksi utama
+ * (Cadangkan Semua / Impor). Variabel warna & spacing pakai token yang
+ * sama dengan halaman lain (lihat src/css/variables.css & themes.css).
+ *
+ * Class `.export-card*` (kartu list "Ekspor Satu Catatan" yang dulu ada di
+ * halaman ini) sudah DIHAPUS bareng markup-nya di cadangkan.html — ekspor
+ * satu catatan sekarang lewat menu titik-tiga note card (lihat
+ * notes/note-card.js & notes/download-note.js).
+ */
+
+.backup-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.backup-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  text-align: left;
+  width: 100%;
+}
+
+.backup-action-btn:hover {
+  background-color: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.backup-action-btn__icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.backup-action-btn__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.backup-action-btn__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.backup-action-btn__desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
