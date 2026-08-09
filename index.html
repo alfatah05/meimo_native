@@ -909,38 +909,11 @@
          Sampah). Ditampilkan by default sejak first paint (tanpa nunggu
          JS), disembunyikan begitu render pertama selesai (lihat boot()
          di card-style.js). -->
-    <div id="cardStyleSkeleton" class="card-style-skeleton skeleton-overlay" aria-hidden="true">
-      <div class="card-style-skeleton__preview">
-        <div class="skeleton-bar card-style-skeleton__preview-card"></div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="skeleton-bar card-style-skeleton__select"></div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="card-style-skeleton__shapes">
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-        </div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="card-style-skeleton__colors">
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-        </div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="skeleton-bar card-style-skeleton__upload-btn"></div>
-      </div>
+    <div id="cardStyleSkeleton" class="list-skeleton skeleton-overlay card-style-skeleton--simple" aria-hidden="true">
+      <!-- Skeleton customisasi ringan: 3 bar polos, tanpa shimmer/grid. -->
+      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border)"></div>
+      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border);width:85%"></div>
+      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border);width:70%"></div>
     </div>
 
     <section class="section">
