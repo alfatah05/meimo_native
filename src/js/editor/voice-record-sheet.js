@@ -440,22 +440,51 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
 
   startTimer();
 
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
+  (async function requestMicThenStart() {
+    try {
+      const Cap = window.Capacitor;
+      const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+      const plug = Cap?.Plugins?.MeimoPermissions;
+      console.log("[voice] native=", isNative, "plugins=", Object.keys(Cap?.Plugins || {}), "MeimoPermissions=", !!plug);
+      if (isNative) {
+        if (!plug?.requestMicrophone) {
+          showError("Plugin mikrofon tidak terpasang. Install ulang APK terbaru dari build.");
+          statusEl.textContent = "Plugin hilang";
+          setPaused(true);
+          return;
+        }
+        const res = await plug.requestMicrophone();
+        console.log("[voice] requestMicrophone result", res);
+        if (res && res.granted === false) {
+          showError("Izin mikrofon ditolak. Buka Pengaturan → Aplikasi → Meimo → Izin → Mikrofon.");
+          statusEl.textContent = "Izin ditolak";
+          setPaused(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("MeimoPermissions.requestMicrophone:", e);
+      showError("Gagal meminta izin mikrofon: " + (e?.message || e));
+      statusEl.textContent = "Error izin";
+      setPaused(true);
+      return;
+    }
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach((t) => t.stop());
         if (!isClosed) setupRecognition();
-      })
-      .catch((err) => {
+      } catch (err) {
         console.warn("getUserMedia:", err);
         showError("Izin mikrofon diperlukan untuk merekam.");
         statusEl.textContent = "Izin ditolak";
         setPaused(true);
-      });
-  } else {
-    setupRecognition();
-  }
+      }
+    } else {
+      setupRecognition();
+    }
+  })();
 }
 
 export function shouldAutoOpenVoiceRecord() {

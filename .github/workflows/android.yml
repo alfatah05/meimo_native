@@ -46,41 +46,16 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch Android (plugins, permissions, styles)
+      - name: Patch Android (plugins + RECORD_AUDIO + styles)
+        run: bash android-patches/patch-android.sh
+
+      - name: Verify RECORD_AUDIO in manifest
         run: |
-          set -euo pipefail
-
-          PKG_DIR="android/app/src/main/java/com/meimo/notes"
-          mkdir -p "$PKG_DIR"
-
-          for f in MeimoSystemBarsPlugin.java MeimoFileSaverPlugin.java NavigationBarPlugin.java MainActivity.java; do
-            if [ -f "android-patches/$f" ]; then
-              cp "android-patches/$f" "$PKG_DIR/"
-              echo "Copied $f"
-            fi
-          done
-
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          if [ -f "$MANIFEST" ]; then
-            if ! grep -q "WRITE_EXTERNAL_STORAGE" "$MANIFEST"; then
-              sed -i 's|</manifest>|    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>|' "$MANIFEST" || true
-            fi
-            if ! grep -q "requestLegacyExternalStorage" "$MANIFEST"; then
-              sed -i 's|<application|<application android:requestLegacyExternalStorage="true"|' "$MANIFEST" || true
-            fi
-            head -50 "$MANIFEST"
-          fi
-
-          for STYLES in android/app/src/main/res/values/styles.xml android/app/src/main/res/values/themes.xml; do
-            if [ -f "$STYLES" ]; then
-              if ! grep -q "navigationBarColor" "$STYLES"; then
-                sed -i 's|</style>|        <item name="android:navigationBarColor">#17181C</item>\n        <item name="android:statusBarColor">#17181C</item>\n        <item name="android:windowLightStatusBar">false</item>\n        <item name="android:windowLightNavigationBar">false</item>\n        <item name="android:windowDrawsSystemBarBackgrounds">true</item>\n    </style>|' "$STYLES" || true
-              fi
-              cat "$STYLES"
-            fi
-          done
-
-          ls -la "$PKG_DIR" || true
+          echo "=== AndroidManifest.xml ==="
+          cat "$MANIFEST"
+          grep -q "RECORD_AUDIO" "$MANIFEST"
+          echo "RECORD_AUDIO OK"
 
       - name: Build debug APK
         working-directory: android
