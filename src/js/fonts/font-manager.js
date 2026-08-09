@@ -116,7 +116,11 @@ function createLibraryItem(font, { installed, onChange }) {
   // dimuat, browser otomatis me-render ulang teks ini dengan font asli.
   nameEl.style.fontFamily = `"${font.family}"`;
   if (!installed) {
-    ensureLibraryFontPreviewLoaded(font);
+    // Lazy: muat file font preview hanya saat baris terlihat di viewport.
+    // Sebelumnya semua item di halaman di-fetch paralel → buka Font Library lambat.
+    nameEl.dataset.fontPreview = "1";
+    nameEl._previewFont = font;
+    observeFontPreview(nameEl);
   }
 
   const actions = createEl("div", { className: "font-item__actions" });
@@ -235,7 +239,7 @@ async function boot() {
 
   // Muat ulang @font-face untuk font yang sudah pernah diunduh sebelumnya,
   // supaya preview nama font di daftar tampil pakai fontnya sendiri.
-  await ensureInstalledFontsLoaded();
+  await ensureInstalledFontsLoaded({ deferRest: true, concurrency: 2 });
 
   async function load() {
     try {

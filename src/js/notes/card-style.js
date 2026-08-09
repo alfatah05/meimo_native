@@ -20,7 +20,7 @@
  */
 
 import * as documentService from "../services/document-service.js";
-import { ensureInstalledFontsLoaded, getAvailableFonts } from "../services/font-service.js";
+import { ensureInstalledFontsLoaded, extractFontFamiliesFromHtml, getAvailableFonts } from "../services/font-service.js";
 import { createDefaultCardStyle } from "../db/schema.js";
 import { createEl, clearChildren, openPanel, closeTransientPickers } from "../utils/dom.js";
 import { createNoteCard } from "./note-card.js";
@@ -61,10 +61,21 @@ async function boot() {
   // Mulai load data SEGERA (paralel dengan animasi page-in), tapi jangan
   // mutasi DOM dulu. FontFace API + render swatch clip-path kompleks
   // sebelumnya jalan di tengah animasi → naik-nya terasa lambat/berat.
-  const dataPromise = Promise.all([
-    noteId ? documentService.loadNote(noteId) : Promise.resolve(null),
-    ensureInstalledFontsLoaded(),
-  ]);
+  const dataPromise = (async () => {
+    const note = noteId ? await documentService.loadNote(noteId) : null;
+    const used = note
+      ? extractFontFamiliesFromHtml(
+          `${note.title || ""} ${note.body || note.content || note.html || ""}`
+        )
+      : [];
+    // Font prioritas dulu; sisa di idle — UI card style tidak tunggu semua font.
+    await ensureInstalledFontsLoaded({
+      families: used,
+      deferRest: true,
+      concurrency: 2,
+    });
+    return [note];
+  })();
 
   // Tunggu animasi page transition selesai (SPA: router.waitForPageTransition;
   // multi-page / tanpa VT: langsung lanjut). Fallback timeout supaya tidak

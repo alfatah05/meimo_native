@@ -58,7 +58,7 @@ export async function getFontLibrary() {
 
   libraryPromise = (async () => {
     try {
-      const res = await fetch(FONT_LIBRARY_MANIFEST_URL, { cache: "no-cache" });
+      const res = await fetch(FONT_LIBRARY_MANIFEST_URL, { cache: "force-cache" });
       if (!res.ok) throw new Error(`Gagal memuat manifest Font Library (status ${res.status}).`);
       const data = await res.json();
       return Array.isArray(data.fonts) ? data.fonts : [];
@@ -185,36 +185,123 @@ function faceKey(family, weight, style) {
 
 async function loadFontRecordFaces(record) {
   if (!record || !Array.isArray(record.files)) return;
-  await Promise.all(
-    record.files.map(async (file) => {
-      const weight = file.weight || 400;
-      const style = file.style || "normal";
-      const key = faceKey(record.family, weight, style);
-      if (loadedFaceKeys.has(key)) return;
-      if (typeof FontFace === "undefined" || !file.bytes) return;
-      try {
-        // `bytes` sudah berupa ArrayBuffer (bukan Blob) — FontFace API
-        // menerima ArrayBuffer langsung, jadi tidak perlu konversi apa pun.
-        const face = new FontFace(record.family, file.bytes, { weight: String(weight), style });
-        await face.load();
-        document.fonts.add(face);
-        loadedFaceKeys.add(key);
-      } catch (err) {
-        console.error(`Gagal memuat font "${record.family}" (${weight}/${style}):`, err);
-      }
-    })
-  );
+  // Sequential per-file dalam 1 family — lebih ringan di main thread
+  // daripada Promise.all puluhan Face sekaligus.
+  for (const file of record.files) {
+    const weight = file.weight || 400;
+    const style = file.style || "normal";
+    const key = faceKey(record.family, weight, style);
+    if (loadedFaceKeys.has(key)) continue;
+    if (typeof FontFace === "undefined" || !file.bytes) continue;
+    try {
+      const face = new FontFace(record.family, file.bytes, {
+        weight: String(weight),
+        style,
+      });
+      await face.load();
+      document.fonts.add(face);
+      loadedFaceKeys.add(key);
+    } catch (err) {
+      console.error(`Gagal memuat font "${record.family}" (${weight}/${style}):`, err);
+    }
+  }
+}
+
+/** Pool concurrency terbatas — hindari spike CPU saat banyak font. */
+async function mapPool(items, fn, concurrency = 2) {
+  const list = Array.from(items || []);
+  if (list.length === 0) return;
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, list.length) }, async () => {
+    while (i < list.length) {
+      const idx = i++;
+      await fn(list[idx]);
+    }
+  });
+  await Promise.all(workers);
+}
+
+function scheduleIdle(fn) {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(() => { fn(); }, { timeout: 2000 });
+  } else {
+    setTimeout(fn, 50);
+  }
 }
 
 /**
- * Pastikan SEMUA font kustom yang sudah diunduh sebelumnya aktif sebagai
- * @font-face di sesi ini. Dipanggil saat editor/Font Manager dibuka supaya
- * teks yang sudah memakai font kustom langsung tampil benar (tanpa ini,
- * teks akan jatuh ke font fallback karena browser belum tahu font-nya).
+ * Muat @font-face font terpasang.
+ * options.families — prioritaskan family ini dulu (yang dipakai note).
+ * options.deferRest — sisanya di background (default true).
+ * options.concurrency — paralel max (default 2).
  */
-export async function ensureInstalledFontsLoaded() {
+export async function ensureInstalledFontsLoaded(options = {}) {
+  const {
+    families = null,
+    deferRest = true,
+    concurrency = 2,
+  } = options;
+
   const installed = await getInstalledFonts();
-  await Promise.all(installed.map(loadFontRecordFaces));
+  if (!installed.length) return;
+
+  const priorityNames = new Set(
+    (families || []).map((f) => String(f || "").toLowerCase()).filter(Boolean)
+  );
+
+  const first = [];
+  const rest = [];
+  for (const rec of installed) {
+    const fam = String(rec.family || "").toLowerCase();
+    const id = String(rec.id || "").toLowerCase();
+    if (priorityNames.size && (priorityNames.has(fam) || priorityNames.has(id))) {
+      first.push(rec);
+    } else if (priorityNames.size) {
+      rest.push(rec);
+    } else {
+      first.push(rec);
+    }
+  }
+
+  // Tanpa priority list: load semua, tapi tetap concurrency terbatas +
+  // bisa defer setengah kedua biar first paint lebih cepat.
+  if (!priorityNames.size && deferRest && first.length > 2) {
+    const head = first.slice(0, 2);
+    const tail = first.slice(2);
+    await mapPool(head, loadFontRecordFaces, concurrency);
+    scheduleIdle(() => {
+      mapPool(tail, loadFontRecordFaces, concurrency).catch(() => {});
+    });
+    return;
+  }
+
+  await mapPool(first, loadFontRecordFaces, concurrency);
+
+  if (rest.length) {
+    if (deferRest) {
+      scheduleIdle(() => {
+        mapPool(rest, loadFontRecordFaces, concurrency).catch(() => {});
+      });
+    } else {
+      await mapPool(rest, loadFontRecordFaces, concurrency);
+    }
+  }
+}
+
+/** Extract font-family names referenced in HTML/CSS-ish note content. */
+export function extractFontFamiliesFromHtml(html) {
+  if (!html) return [];
+  const found = new Set();
+  const re = /font-family\s*:\s*([^;"']+)/gi;
+  let m;
+  while ((m = re.exec(String(html)))) {
+    const raw = m[1]
+      .split(",")[0]
+      .replace(/["']/g, "")
+      .trim();
+    if (raw) found.add(raw);
+  }
+  return Array.from(found);
 }
 
 // Lacak kombinasi family+weight+style yang sudah dimuat KHUSUS untuk

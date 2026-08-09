@@ -320,6 +320,25 @@ async function bootSpa() {
 
   initRouter({ onRoute });
 
+  // Prefetch modul halaman berat di idle — buka berikutnya lebih instan.
+  const preloadHeavy = () => {
+    import("./fonts/font-manager.js").catch(() => {});
+    import("./notes/card-style.js").catch(() => {});
+    import("./services/font-service.js")
+      .then((m) => {
+        if (m.ensureInstalledFontsLoaded) {
+          m.ensureInstalledFontsLoaded({ deferRest: true, concurrency: 1 }).catch(() => {});
+        }
+      })
+      .catch(() => {});
+  };
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(preloadHeavy, { timeout: 3000 });
+  } else {
+    setTimeout(preloadHeavy, 800);
+  }
+
+
   import("./pwa/sw-register.js").catch(() => {});
   import("./pwa/install-prompt.js").catch(() => {});
   import("./utils/native-feel.js").catch(() => {});
