@@ -120,22 +120,8 @@ export function safeFileNameFromTitle(title) {
 }
 
 async function triggerBlobDownload(blob, fileName) {
-  try {
-    const { saveToDownloads, isNative } = await import("../native/capacitor-bridge.js");
-    if (isNative()) {
-      await saveToDownloads(blob, fileName, blob.type || "application/octet-stream");
-      return;
-    }
-  } catch (_) {}
-  // Web / fallback
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  const { saveToDownloads } = await import("../native/capacitor-bridge.js");
+  return saveToDownloads(blob, fileName, blob.type || "application/octet-stream");
 }
 
 /**
@@ -207,7 +193,7 @@ export async function exportNoteAsMeimo(doc) {
   const zipBlob = new Blob([bytes], { type: MEIMO_MIME_TYPE });
 
   const fileName = `${safeFileNameFromTitle(doc.title)}.meimo`;
-  await triggerBlobDownload(zipBlob, fileName);
+  const saveResult = await triggerBlobDownload(zipBlob, fileName);
 
-  return { assetCount, fileName };
+  return { assetCount, fileName, saveResult };
 }

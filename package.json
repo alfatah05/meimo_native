@@ -1,7 +1,7 @@
 {
   "name": "meimo",
   "version": "1.23.22",
-  "description": "Meimo — Catatan Pribadi native (Capacitor)",
+  "description": "Meimo \u2014 Catatan Pribadi native (Capacitor)",
   "main": "index.html",
   "scripts": {
     "prepare:www": "bash scripts/prepare-www.sh",
@@ -13,7 +13,13 @@
     "android:debug": "cd android && ./gradlew assembleDebug",
     "android:release": "cd android && ./gradlew assembleRelease"
   },
-  "keywords": ["notes", "capacitor", "pwa", "offline", "meimo"],
+  "keywords": [
+    "notes",
+    "capacitor",
+    "pwa",
+    "offline",
+    "meimo"
+  ],
   "author": "Meimo",
   "license": "ISC",
   "type": "module",
@@ -24,7 +30,8 @@
     "@capacitor/filesystem": "^6.0.2",
     "@capacitor/preferences": "^6.0.3",
     "@capacitor/splash-screen": "^6.0.3",
-    "@capacitor/status-bar": "^6.0.2"
+    "@capacitor/status-bar": "^6.0.2",
+    "@capacitor/share": "^6.0.2"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0"

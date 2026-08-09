@@ -46,19 +46,50 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch AndroidManifest for storage
+      - name: Patch Android (permissions + NavigationBar plugin)
         run: |
+          set -e
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
             if ! grep -q "WRITE_EXTERNAL_STORAGE" "$MANIFEST"; then
-              # Sisipkan permission sebelum tag penutup application atau manifest
-              if grep -q "</application>" "$MANIFEST"; then
-                sed -i 's|</manifest>|<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>|' "$MANIFEST" || true
+              sed -i 's|</manifest>|    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>|' "$MANIFEST" || true
+            fi
+          fi
+
+          # Copy NavigationBar plugin
+          PKG_DIR="android/app/src/main/java/com/meimo/notes"
+          mkdir -p "$PKG_DIR"
+          if [ -f android-patches/NavigationBarPlugin.java ]; then
+            cp android-patches/NavigationBarPlugin.java "$PKG_DIR/"
+          fi
+
+          # Register plugin in MainActivity
+          MAIN=$(find android/app/src/main/java -name "MainActivity.java" | head -1)
+          if [ -n "$MAIN" ] && [ -f "$MAIN" ]; then
+            if ! grep -q "MeimoNavigationBar\|NavigationBarPlugin" "$MAIN"; then
+              # Ensure import + registerPlugin
+              if ! grep -q "import com.meimo.notes.NavigationBarPlugin" "$MAIN"; then
+                sed -i 's|import com.getcapacitor.BridgeActivity;|import com.getcapacitor.BridgeActivity;\nimport com.meimo.notes.NavigationBarPlugin;|' "$MAIN" || true
+              fi
+              if grep -q "onCreate" "$MAIN"; then
+                sed -i '/super.onCreate/a\        registerPlugin(NavigationBarPlugin.class);' "$MAIN" || true
+              else
+                # BridgeActivity auto-loads annotated plugins on newer Capacitor — annotation may be enough
+                echo "MainActivity has no onCreate — relying on @CapacitorPlugin annotation"
+              fi
+              echo "--- MainActivity ---"
+              cat "$MAIN"
+            fi
+          fi
+
+          # Default nav/status bar colors in styles
+          for STYLES in android/app/src/main/res/values/styles.xml android/app/src/main/res/values/themes.xml; do
+            if [ -f "$STYLES" ]; then
+              if ! grep -q "navigationBarColor" "$STYLES"; then
+                sed -i 's|</style>|    <item name="android:navigationBarColor">#17181C</item>\n        <item name="android:statusBarColor">#17181C</item>\n        <item name="android:windowLightStatusBar">false</item>\n        <item name="android:windowLightNavigationBar">false</item>\n    </style>|' "$STYLES" || true
               fi
             fi
-            # Pastikan usesCleartextTraffic / hardwareAccelerated ok
-            cat "$MANIFEST" | head -40
-          fi
+          done
 
       - name: Build debug APK
         working-directory: android
