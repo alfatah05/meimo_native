@@ -1,39 +1,38 @@
 /**
  * fonts-repository.js
- * Repository layer — SATU-SATUNYA tempat operasi CRUD mentah ke IndexedDB
- * untuk font kustom yang sudah diunduh user dijalankan (lewat helper di db.js).
- *
- * Sama seperti notes-repository.js: file ini sengaja "bodoh" (tidak tahu
- * aturan bisnis seperti mengunduh berkas dari Font Library, memuat
- * @font-face, dsb) — itu tugas Font Service (src/js/services/font-service.js).
- *
- * Arsitektur:
- *   Font Family Dropdown / Font Manager -> Font Service -> Repository (file ini) -> IndexedDB (db.js)
- *
- * Modul lain DILARANG mengimpor file ini secara langsung — semua akses
- * lewat font-service.js.
+ * Native: Filesystem. Web: IndexedDB.
  */
 
 import { withStore, requestToPromise } from "./db.js";
 import { STORES } from "./schema.js";
+import { isNative } from "../native/capacitor-bridge.js";
+import * as FS from "./fs-storage.js";
 
-/** Simpan (buat baru atau timpa) satu font kustom. */
+async function useFs() {
+  try {
+    return isNative() && (await FS.isFsAvailable());
+  } catch {
+    return false;
+  }
+}
+
 export async function putFont(font) {
+  if (await useFs()) return FS.putFontFS(font);
   await withStore(STORES.FONTS, "readwrite", (store) => requestToPromise(store.put(font)));
   return font;
 }
 
-/** Ambil satu font berdasarkan id. `undefined` bila belum diunduh/tidak ada. */
 export async function getFontById(id) {
+  if (await useFs()) return FS.getFontByIdFS(id);
   return withStore(STORES.FONTS, "readonly", (store) => requestToPromise(store.get(id)));
 }
 
-/** Ambil seluruh font kustom yang sudah diunduh. */
 export async function getAllFonts() {
+  if (await useFs()) return FS.getAllFontsFS();
   return withStore(STORES.FONTS, "readonly", (store) => requestToPromise(store.getAll()));
 }
 
-/** Hapus satu font kustom secara permanen dari penyimpanan lokal. */
 export async function deleteFont(id) {
+  if (await useFs()) return FS.deleteFontFS(id);
   await withStore(STORES.FONTS, "readwrite", (store) => requestToPromise(store.delete(id)));
 }

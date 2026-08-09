@@ -285,12 +285,25 @@ async function onRoute(route) {
   }
 }
 
-function bootSpa() {
+async function bootSpa() {
   // Bahasa UI (English default) — apply data-i18n sebelum view pertama tampil
   try {
     initI18n();
   } catch (e) {
     console.warn("[spa] i18n init failed", e);
+  }
+
+  // Native: init Capacitor + migrasi IDB→Filesystem SEBELUM router/notes load
+  try {
+    const bridge = await import("./native/capacitor-bridge.js");
+    await bridge.initNative();
+    if (bridge.isNative()) {
+      const { migrateIdbToFilesystem } = await import("./db/migrate-to-fs.js");
+      const result = await migrateIdbToFilesystem();
+      console.log("[spa] storage migration:", result);
+    }
+  } catch (e) {
+    console.warn("[spa] native/migration init failed", e);
   }
 
   for (const vid of Object.values(VIEW_IDS)) {
@@ -310,7 +323,6 @@ function bootSpa() {
   import("./pwa/sw-register.js").catch(() => {});
   import("./pwa/install-prompt.js").catch(() => {});
   import("./utils/native-feel.js").catch(() => {});
-  import("./native/capacitor-bridge.js").then((m) => m.initNative()).catch(() => {});
 }
 
 if (document.readyState === "loading") {
