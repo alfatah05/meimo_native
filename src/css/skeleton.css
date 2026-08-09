@@ -309,22 +309,32 @@
 .card-style-skeleton__shape:nth-child(5),
 .card-style-skeleton__color:nth-child(5) { animation-delay: 120ms; }
 
-
-/* Skeleton customisasi versi ringan — tanpa shimmer (aman di View Transition). */
-.card-style-skeleton--simple .skeleton-bar,
-.card-style-skeleton--simple.list-skeleton .list-skeleton__row {
-  animation: none !important;
-  background: var(--color-border) !important;
-  background-size: auto !important;
-}
-.card-style-skeleton--simple.list-skeleton {
+/* Skeleton customisasi versi ringan — tanpa shimmer (aman di View Transition).
+   3 kotak full-width; kotak atas ~4× lebih tinggi (pratinjau kartu). */
+.card-style-skeleton--simple.list-skeleton,
+.card-style-skeleton--simple {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   padding-top: var(--space-md);
-}
-.card-style-skeleton--simple .list-skeleton__row {
-  height: 48px;
-  border-radius: var(--radius-sm);
   width: 100%;
+  box-sizing: border-box;
+}
+.card-style-skeleton--simple .skeleton-bar,
+.card-style-skeleton--simple .list-skeleton__row {
+  animation: none !important;
+  background: var(--color-border) !important;
+  background-size: auto !important;
+  width: 100% !important;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: var(--radius-sm);
+  height: 48px;
+  flex-shrink: 0;
+}
+/* Kotak paling atas: 4× tinggi bar biasa (pratinjau) */
+.card-style-skeleton--simple .list-skeleton__row:first-child,
+.card-style-skeleton--simple .skeleton-bar:first-child {
+  height: 192px; /* 48 × 4 */
+  border-radius: var(--radius-lg);
 }

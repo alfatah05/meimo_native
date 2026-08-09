@@ -96,11 +96,9 @@
          JS), disembunyikan begitu render pertama selesai (lihat boot()
          di card-style.js). -->
     <div id="cardStyleSkeleton" class="list-skeleton skeleton-overlay card-style-skeleton--simple" aria-hidden="true">
-      <!-- Skeleton super ringan: 3 bar statis, TANPA shimmer infinite.
-           Shimmer + grid kompleks sebelumnya tabrakan dengan View Transition. -->
-      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border)"></div>
-      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border);width:85%"></div>
-      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border);width:70%"></div>
+      <div class="skeleton-bar list-skeleton__row"></div>
+      <div class="skeleton-bar list-skeleton__row"></div>
+      <div class="skeleton-bar list-skeleton__row"></div>
     </div>
 
     <section class="section">
