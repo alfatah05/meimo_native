@@ -1,110 +1,38 @@
 /**
  * capacitor-bridge.js
- * StatusBar + NavBar theme, hardware back, save-to-Downloads.
- * Tanpa static import @capacitor/* (aman di web).
+ *
+ * PENTING: project ini STATIC (tanpa Vite/webpack).
+ * Jangan pakai `import("@capacitor/...")` — di WebView bare specifier gagal.
+ * Semua plugin diakses lewat window.Capacitor.Plugins (di-inject native).
  */
 
-let _Capacitor = null;
-let _StatusBar = null;
-let _SplashScreen = null;
-let _App = null;
-let _Filesystem = null;
-let _Directory = null;
-let _Encoding = null;
-let _Share = null;
-let _ready = false;
+function getCap() {
+  return typeof window !== "undefined" ? window.Capacitor : null;
+}
 
 export function isNative() {
   try {
-    return !!(
-      typeof window !== "undefined" &&
-      window.Capacitor &&
-      typeof window.Capacitor.isNativePlatform === "function" &&
-      window.Capacitor.isNativePlatform()
-    );
+    const c = getCap();
+    return !!(c && typeof c.isNativePlatform === "function" && c.isNativePlatform());
   } catch {
     return false;
   }
 }
 
-export async function initNative() {
-  if (!isNative()) return false;
-  if (_ready) return true;
-
+function plugin(name) {
   try {
-    const core = await import("@capacitor/core");
-    _Capacitor = core.Capacitor;
+    const c = getCap();
+    return c?.Plugins?.[name] || null;
+  } catch {
+    return null;
+  }
+}
 
-    try {
-      const sb = await import("@capacitor/status-bar");
-      _StatusBar = sb.StatusBar;
-    } catch (e) {
-      console.warn("[Meimo] status-bar plugin missing", e);
-    }
-
-    try {
-      const sp = await import("@capacitor/splash-screen");
-      _SplashScreen = sp.SplashScreen;
-    } catch (_) {}
-
-    try {
-      const appMod = await import("@capacitor/app");
-      _App = appMod.App;
-    } catch (_) {}
-
-    try {
-      const fs = await import("@capacitor/filesystem");
-      _Filesystem = fs.Filesystem;
-      _Directory = fs.Directory;
-      _Encoding = fs.Encoding;
-    } catch (e) {
-      console.warn("[Meimo] filesystem plugin missing", e);
-    }
-
-    try {
-      const sh = await import("@capacitor/share");
-      _Share = sh.Share;
-    } catch (_) {
-      // optional
-    }
-
-    try {
-      await _SplashScreen?.hide();
-    } catch (_) {}
-
-    // overlay=false supaya warna background bar benar-benar terlihat
-    try {
-      await _StatusBar?.setOverlaysWebView({ overlay: false });
-    } catch (_) {}
-
-    if (_App?.addListener) {
-      _App.addListener("backButton", () => {
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          try {
-            _App.exitApp();
-          } catch (_) {}
-        }
-      });
-    }
-
-    // Terapkan tema tersimpan segera (first paint native)
-    let theme = "dark";
-    try {
-      theme =
-        document.documentElement.getAttribute("data-theme") ||
-        localStorage.getItem("notes-app-theme") ||
-        "dark";
-    } catch (_) {}
-    await applyNativeThemeColor(theme);
-
-    _ready = true;
-    console.log("[Meimo Native] bridge ready");
-    return true;
-  } catch (err) {
-    console.warn("[Meimo Native] init skipped:", err?.message || err);
-    return false;
+function platform() {
+  try {
+    return getCap()?.getPlatform?.() || "web";
+  } catch {
+    return "web";
   }
 }
 
@@ -116,7 +44,7 @@ const THEME_BG = {
   oled: "#000000",
 };
 
-/** Style icon: DARK = ikon gelap (bg terang), LIGHT = ikon terang (bg gelap) */
+/** Capacitor Style: Dark = ikon gelap (bg terang), Light = ikon terang (bg gelap) */
 const THEME_STYLE = {
   light: "DARK",
   dark: "LIGHT",
@@ -125,201 +53,252 @@ const THEME_STYLE = {
   oled: "LIGHT",
 };
 
-/**
- * Set warna StatusBar + NavigationBar + kontras ikon.
- * Dipanggil saat init dan setiap ganti tema.
- */
+let _ready = false;
+let _backHooked = false;
+
+export async function initNative() {
+  if (!isNative()) return false;
+  if (_ready) return true;
+
+  try {
+    // Splash
+    try {
+      await plugin("SplashScreen")?.hide?.();
+    } catch (_) {}
+
+    // StatusBar: jangan overlay supaya warna solid terlihat
+    const StatusBar = plugin("StatusBar");
+    try {
+      await StatusBar?.setOverlaysWebView?.({ overlay: false });
+    } catch (_) {}
+
+    // Hardware back
+    if (!_backHooked) {
+      const App = plugin("App");
+      if (App?.addListener) {
+        App.addListener("backButton", () => {
+          if (window.history.length > 1) window.history.back();
+          else {
+            try {
+              App.exitApp?.();
+            } catch (_) {}
+          }
+        });
+        _backHooked = true;
+      }
+    }
+
+    // Tema tersimpan → bars
+    let theme = "dark";
+    try {
+      theme =
+        document.documentElement.getAttribute("data-theme") ||
+        localStorage.getItem("notes-app-theme") ||
+        "dark";
+    } catch (_) {}
+    await applyNativeThemeColor(theme);
+
+    _ready = true;
+    console.log("[Meimo Native] bridge ready via Capacitor.Plugins", {
+      platform: platform(),
+      plugins: Object.keys(getCap()?.Plugins || {}),
+    });
+    return true;
+  } catch (err) {
+    console.warn("[Meimo Native] init failed:", err);
+    return false;
+  }
+}
+
 export async function applyNativeThemeColor(themeId) {
   if (!isNative()) return;
 
-  // Pastikan plugin termuat
-  if (!_StatusBar) {
-    try {
-      await initNative();
-    } catch (_) {}
-  }
-
   const bg = THEME_BG[themeId] || THEME_BG.dark;
   const style = THEME_STYLE[themeId] || "LIGHT";
+  const darkIcons = style === "DARK"; // true = dark icons on light bg
 
-  // meta theme-color (beberapa WebView ikut ini)
   try {
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", bg);
   } catch (_) {}
 
-  if (_StatusBar) {
+  // 1) Official StatusBar plugin
+  const StatusBar = plugin("StatusBar");
+  if (StatusBar) {
     try {
-      await _StatusBar.setOverlaysWebView({ overlay: false });
+      await StatusBar.setOverlaysWebView?.({ overlay: false });
     } catch (_) {}
     try {
-      await _StatusBar.setBackgroundColor({ color: bg });
+      await StatusBar.setBackgroundColor?.({ color: bg });
     } catch (e) {
-      console.warn("[Meimo] setBackgroundColor", e);
+      console.warn("[Meimo] StatusBar.setBackgroundColor", e);
     }
     try {
-      // Capacitor: Style.Dark = dark icons, Style.Light = light icons
-      await _StatusBar.setStyle({ style });
+      await StatusBar.setStyle?.({ style });
     } catch (e) {
-      console.warn("[Meimo] setStyle", e);
+      console.warn("[Meimo] StatusBar.setStyle", e);
     }
   }
 
-  // Navigation bar (Android) — lewat bridge internal Capacitor bila ada
-  await setAndroidNavigationBar(bg, style === "DARK");
-}
-
-/**
- * Set warna navigation bar Android.
- * Menggunakan Capacitor Plugin registry / reflection lewat
- * window.Capacitor.Plugins bila tersedia; fallback CSS env tidak cukup
- * untuk nav bar sistem, jadi kita coba StatusBar API berulang +
- * document theme-color.
- */
-async function setAndroidNavigationBar(hexColor, darkIcons) {
-  try {
-    if (!_Capacitor || _Capacitor.getPlatform() !== "android") return;
-
-    const plugins = window.Capacitor?.Plugins || {};
-
-    // Custom plugin (android-patches/NavigationBarPlugin.java)
-    if (plugins.MeimoNavigationBar?.setColor) {
-      await plugins.MeimoNavigationBar.setColor({
-        color: hexColor,
-        darkButtons: darkIcons,
+  // 2) Custom MeimoSystemBars (status + nav bar, andal di Android 10–15)
+  const SystemBars = plugin("MeimoSystemBars");
+  if (SystemBars?.setColors) {
+    try {
+      await SystemBars.setColors({
+        color: bg,
+        darkIcons,
       });
-      return;
+    } catch (e) {
+      console.warn("[Meimo] MeimoSystemBars.setColors", e);
     }
-
-    if (plugins.NavigationBar?.setColor) {
-      await plugins.NavigationBar.setColor({ color: hexColor, darkButtons: darkIcons });
-      return;
+  } else {
+    // Fallback nav bar saja
+    const Nav = plugin("MeimoNavigationBar");
+    if (Nav?.setColor) {
+      try {
+        await Nav.setColor({ color: bg, darkButtons: darkIcons });
+      } catch (_) {}
     }
-    if (plugins.StatusBar?.setNavigationBarColor) {
-      await plugins.StatusBar.setNavigationBarColor({ color: hexColor });
-      return;
-    }
-  } catch (e) {
-    console.warn("[Meimo] nav bar color", e);
   }
 }
 
 /**
- * Simpan file ke Download (native) atau trigger <a download> (web).
+ * Simpan file ke folder Download publik (MediaStore) di Android.
+ * Fallback: Documents → Cache + Share → <a download>.
  */
 export async function saveToDownloads(blobOrBase64, fileName, mimeType = "application/octet-stream") {
-  // Web
   if (!isNative()) {
-    return webDownload(blobOrBase64, fileName, mimeType);
-  }
-
-  // Pastikan plugin siap
-  if (!_Filesystem || !_Directory) {
-    await initNative();
-  }
-  if (!_Filesystem || !_Directory) {
-    console.warn("[Meimo] Filesystem unavailable, web fallback");
     return webDownload(blobOrBase64, fileName, mimeType);
   }
 
   let base64;
   if (blobOrBase64 instanceof Blob) {
     base64 = await blobToBase64(blobOrBase64);
+    if (!mimeType || mimeType === "application/octet-stream") {
+      mimeType = blobOrBase64.type || mimeType;
+    }
   } else {
     base64 = String(blobOrBase64).replace(/^data:[^;]+;base64,/, "");
   }
 
-  // Minta permission baca/tulis storage (Android ≤12)
-  try {
-    if (typeof _Filesystem.requestPermissions === "function") {
-      await _Filesystem.requestPermissions();
-    }
-  } catch (_) {}
-
-  const attempts = [];
-
-  // 1) ExternalStorage/Download/ (paling dekat folder Download user)
-  attempts.push(async () => {
-    const r = await _Filesystem.writeFile({
-      path: `Download/${fileName}`,
-      data: base64,
-      directory: _Directory.ExternalStorage,
-      recursive: true,
-    });
-    return { path: r.uri || `Download/${fileName}`, where: "Download" };
-  });
-
-  // 2) Directory.External + Download
-  if (_Directory.External) {
-    attempts.push(async () => {
-      const r = await _Filesystem.writeFile({
-        path: `Download/${fileName}`,
-        data: base64,
-        directory: _Directory.External,
-        recursive: true,
+  // A) Custom plugin MediaStore → public Downloads (paling andal)
+  const Saver = plugin("MeimoFileSaver");
+  if (Saver?.saveToDownloads) {
+    try {
+      const res = await Saver.saveToDownloads({
+        fileName,
+        base64,
+        mimeType,
       });
-      return { path: r.uri || fileName, where: "External/Download" };
-    });
+      console.log("[Meimo] MeimoFileSaver OK", res);
+      return { path: res?.uri || res?.path || fileName, where: "Download", native: true };
+    } catch (e) {
+      console.warn("[Meimo] MeimoFileSaver failed", e);
+    }
   }
 
-  // 3) Documents
-  attempts.push(async () => {
-    const r = await _Filesystem.writeFile({
-      path: fileName,
-      data: base64,
-      directory: _Directory.Documents,
-      recursive: true,
-    });
-    return { path: r.uri || fileName, where: "Documents" };
-  });
+  // B) Filesystem plugin (Capacitor.Plugins.Filesystem)
+  const Filesystem = plugin("Filesystem");
+  const Directory = guessDirectoryEnum(Filesystem);
 
-  // 4) Cache + Share sheet (user bisa "Save to Downloads")
-  attempts.push(async () => {
-    const r = await _Filesystem.writeFile({
-      path: fileName,
-      data: base64,
-      directory: _Directory.Cache,
-      recursive: true,
-    });
-    let uri = r.uri;
+  if (Filesystem?.writeFile) {
+    // Permission
     try {
-      const u = await _Filesystem.getUri({
-        path: fileName,
-        directory: _Directory.Cache,
-      });
-      uri = u.uri || uri;
+      await Filesystem.requestPermissions?.();
     } catch (_) {}
 
-    if (_Share && uri) {
-      try {
-        await _Share.share({
-          title: fileName,
-          url: uri,
-          dialogTitle: "Simpan file",
-        });
-        return { path: uri, where: "Share", shared: true };
-      } catch (_) {}
-    }
-    return { path: uri || fileName, where: "Cache" };
-  });
+    const tries = [
+      { path: `Download/${fileName}`, directory: Directory.EXTERNAL_STORAGE },
+      { path: `Download/${fileName}`, directory: Directory.EXTERNAL },
+      { path: fileName, directory: Directory.DOCUMENTS },
+      { path: fileName, directory: Directory.DATA },
+      { path: fileName, directory: Directory.CACHE },
+    ];
 
-  let lastErr = null;
-  for (const attempt of attempts) {
-    try {
-      const result = await attempt();
-      console.log("[Meimo] file saved:", result);
-      return { ...result, native: true };
-    } catch (e) {
-      lastErr = e;
-      console.warn("[Meimo] save attempt failed:", e?.message || e);
+    for (const t of tries) {
+      if (t.directory == null) continue;
+      try {
+        const r = await Filesystem.writeFile({
+          path: t.path,
+          data: base64,
+          directory: t.directory,
+          recursive: true,
+        });
+        console.log("[Meimo] Filesystem write OK", t, r);
+
+        // Share sheet sebagai cara user menyimpan ke Download
+        if (t.directory === Directory.CACHE || t.directory === Directory.DATA) {
+          const shared = await tryShare(Filesystem, t.path, t.directory, fileName, r?.uri);
+          if (shared) return shared;
+        }
+
+        return {
+          path: r?.uri || t.path,
+          where: String(t.directory),
+          native: true,
+        };
+      } catch (e) {
+        console.warn("[Meimo] write fail", t, e);
+      }
     }
   }
 
-  // Terakhir: web-style download di WebView (kadang tetap jalan)
+  // C) Web-style di WebView
   try {
     return webDownload(blobOrBase64, fileName, mimeType);
   } catch (e) {
-    throw lastErr || e;
+    throw new Error("Gagal menyimpan file: " + (e?.message || e));
+  }
+}
+
+function guessDirectoryEnum(Filesystem) {
+  // Capacitor injects Directory on the plugin in some builds; otherwise use string constants
+  // Official values: DOCUMENTSCACHE, DATA, CACHE, EXTERNAL, EXTERNAL_STORAGE, LIBRARY...
+  const D = {
+    DOCUMENTS: "DOCUMENTS",
+    DATA: "DATA",
+    CACHE: "CACHE",
+    EXTERNAL: "EXTERNAL",
+    EXTERNAL_STORAGE: "EXTERNAL_STORAGE",
+  };
+  // Prefer real enum if present on plugin / global
+  try {
+    const capD = getCap()?.Directory || Filesystem?.Directory;
+    if (capD) {
+      return {
+        DOCUMENTS: capD.Documents ?? capD.DOCUMENTS ?? D.DOCUMENTS,
+        DATA: capD.Data ?? capD.DATA ?? D.DATA,
+        CACHE: capD.Cache ?? capD.CACHE ?? D.CACHE,
+        EXTERNAL: capD.External ?? capD.EXTERNAL ?? D.EXTERNAL,
+        EXTERNAL_STORAGE: capD.ExternalStorage ?? capD.EXTERNAL_STORAGE ?? D.EXTERNAL_STORAGE,
+      };
+    }
+  } catch (_) {}
+  return D;
+}
+
+async function tryShare(Filesystem, path, directory, fileName, uriHint) {
+  const Share = plugin("Share");
+  if (!Share?.share) return null;
+
+  let uri = uriHint;
+  try {
+    const u = await Filesystem.getUri?.({ path, directory });
+    uri = u?.uri || uri;
+  } catch (_) {}
+
+  if (!uri) return null;
+
+  try {
+    await Share.share({
+      title: fileName,
+      url: uri,
+      dialogTitle: "Simpan / bagikan file",
+    });
+    return { path: uri, where: "Share", shared: true, native: true };
+  } catch (e) {
+    console.warn("[Meimo] Share failed", e);
+    return null;
   }
 }
 
@@ -338,17 +317,14 @@ function webDownload(blobOrBase64, fileName, mimeType) {
   setTimeout(() => {
     a.remove();
     URL.revokeObjectURL(url);
-  }, 2000);
+  }, 2500);
   return { path: fileName, web: true };
 }
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = reader.result || "";
-      resolve(String(dataUrl).split(",")[1] || "");
-    };
+    reader.onloadend = () => resolve(String(reader.result || "").split(",")[1] || "");
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
@@ -362,6 +338,21 @@ function base64ToBlob(base64, mime) {
   return new Blob([arr], { type: mime });
 }
 
+/** Dipakai fs-storage.js */
 export function getFilesystem() {
-  return { Filesystem: _Filesystem, Directory: _Directory, Encoding: _Encoding };
+  const Filesystem = plugin("Filesystem");
+  const Directory = guessDirectoryEnum(Filesystem);
+  // Map ke bentuk mirip @capacitor/filesystem enum
+  const DirObj = {
+    Data: Directory.DATA,
+    Cache: Directory.CACHE,
+    Documents: Directory.DOCUMENTS,
+    External: Directory.EXTERNAL,
+    ExternalStorage: Directory.EXTERNAL_STORAGE,
+  };
+  return {
+    Filesystem,
+    Directory: DirObj,
+    Encoding: { UTF8: "utf8" },
+  };
 }

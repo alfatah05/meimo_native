@@ -1,14 +1,16 @@
-Meimo Native Patch v1.23.22-cap5
+Meimo Native Patch v1.23.22-cap6
 ================================
 
-FIX:
-1. Download note (.meimo) + Cadangkan zip — multi-fallback:
-   ExternalStorage/Download → External → Documents → Cache+Share
-2. StatusBar warna = tema (realtime + cold start)
-3. NavigationBar warna = tema (plugin MeimoNavigationBar)
-4. Icon status/nav kontras (DARK icons di tema terang, LIGHT di gelap)
-5. overlay=false supaya warna bar terlihat jelas
+ROOT CAUSE FIX:
+  App static tanpa bundler → import("@capacitor/...") GAGAL di WebView.
+  Semua akses plugin sekarang lewat window.Capacitor.Plugins.
+
+BARU:
+  MeimoSystemBars  → set warna StatusBar + NavigationBar + kontras ikon
+  MeimoFileSaver   → simpan ke folder Download publik via MediaStore (Android 10+)
 
 Apply:
-  unzip -o meimo-patch-v1.23.22-cap5.zip
-  git add . && git commit -m "fix: download + status/nav bar theme (cap5)" && git push
+  unzip -o meimo-patch-v1.23.22-cap6.zip
+  git add . && git commit -m "fix: Capacitor.Plugins + MediaStore download + system bars (cap6)" && git push
+
+WAJIB install APK baru dari Actions (bukan hanya refresh web).

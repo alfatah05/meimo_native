@@ -46,50 +46,76 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch Android (permissions + NavigationBar plugin)
+      - name: Patch Android (plugins, permissions, styles)
         run: |
-          set -e
+          set -euo pipefail
+
+          PKG_DIR="android/app/src/main/java/com/meimo/notes"
+          mkdir -p "$PKG_DIR"
+
+          # Copy custom plugins
+          for f in MeimoSystemBarsPlugin.java MeimoFileSaverPlugin.java NavigationBarPlugin.java; do
+            if [ -f "android-patches/$f" ]; then
+              cp "android-patches/$f" "$PKG_DIR/"
+              echo "Copied $f"
+            fi
+          done
+
+          # Register plugins in MainActivity
+          MAIN=$(find android/app/src/main/java -name "MainActivity.java" | head -1)
+          echo "MainActivity: $MAIN"
+          if [ -n "$MAIN" ] && [ -f "$MAIN" ]; then
+            # Ensure package + BridgeActivity
+            if ! grep -q "registerPlugin" "$MAIN"; then
+              # Rewrite MainActivity with explicit plugin registration
+              cat > "$MAIN" << 'MAINJAVA'
+package com.meimo.notes;
+
+import android.os.Bundle;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+  @Override
+  public void onCreate(Bundle savedInstanceState) {
+    registerPlugin(MeimoSystemBarsPlugin.class);
+    registerPlugin(MeimoFileSaverPlugin.class);
+    registerPlugin(NavigationBarPlugin.class);
+    super.onCreate(savedInstanceState);
+  }
+}
+MAINJAVA
+              echo "Rewrote MainActivity with plugins"
+              cat "$MAIN"
+            fi
+          fi
+
+          # Permissions
           MANIFEST="android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
             if ! grep -q "WRITE_EXTERNAL_STORAGE" "$MANIFEST"; then
               sed -i 's|</manifest>|    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>|' "$MANIFEST" || true
             fi
-          fi
-
-          # Copy NavigationBar plugin
-          PKG_DIR="android/app/src/main/java/com/meimo/notes"
-          mkdir -p "$PKG_DIR"
-          if [ -f android-patches/NavigationBarPlugin.java ]; then
-            cp android-patches/NavigationBarPlugin.java "$PKG_DIR/"
-          fi
-
-          # Register plugin in MainActivity
-          MAIN=$(find android/app/src/main/java -name "MainActivity.java" | head -1)
-          if [ -n "$MAIN" ] && [ -f "$MAIN" ]; then
-            if ! grep -q "MeimoNavigationBar\|NavigationBarPlugin" "$MAIN"; then
-              # Ensure import + registerPlugin
-              if ! grep -q "import com.meimo.notes.NavigationBarPlugin" "$MAIN"; then
-                sed -i 's|import com.getcapacitor.BridgeActivity;|import com.getcapacitor.BridgeActivity;\nimport com.meimo.notes.NavigationBarPlugin;|' "$MAIN" || true
-              fi
-              if grep -q "onCreate" "$MAIN"; then
-                sed -i '/super.onCreate/a\        registerPlugin(NavigationBarPlugin.class);' "$MAIN" || true
-              else
-                # BridgeActivity auto-loads annotated plugins on newer Capacitor — annotation may be enough
-                echo "MainActivity has no onCreate — relying on @CapacitorPlugin annotation"
-              fi
-              echo "--- MainActivity ---"
-              cat "$MAIN"
+            # requestLegacyExternalStorage for older write paths
+            if ! grep -q "requestLegacyExternalStorage" "$MANIFEST"; then
+              sed -i 's|<application|<application android:requestLegacyExternalStorage="true"|' "$MANIFEST" || true
             fi
+            echo "--- Manifest head ---"
+            head -50 "$MANIFEST"
           fi
 
-          # Default nav/status bar colors in styles
+          # Styles: solid system bars
           for STYLES in android/app/src/main/res/values/styles.xml android/app/src/main/res/values/themes.xml; do
             if [ -f "$STYLES" ]; then
+              echo "Patching $STYLES"
               if ! grep -q "navigationBarColor" "$STYLES"; then
-                sed -i 's|</style>|    <item name="android:navigationBarColor">#17181C</item>\n        <item name="android:statusBarColor">#17181C</item>\n        <item name="android:windowLightStatusBar">false</item>\n        <item name="android:windowLightNavigationBar">false</item>\n    </style>|' "$STYLES" || true
+                sed -i 's|</style>|        <item name="android:navigationBarColor">#17181C</item>\n        <item name="android:statusBarColor">#17181C</item>\n        <item name="android:windowLightStatusBar">false</item>\n        <item name="android:windowLightNavigationBar">false</item>\n        <item name="android:windowDrawsSystemBarBackgrounds">true</item>\n    </style>|' "$STYLES" || true
               fi
+              cat "$STYLES"
             fi
           done
+
+          # List plugins in java package
+          ls -la "$PKG_DIR" || true
 
       - name: Build debug APK
         working-directory: android
