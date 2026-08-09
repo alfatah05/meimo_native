@@ -1,13 +1,11 @@
-Meimo patch v1.24.0-apk-only
+Meimo patch v1.24.0-icon-full
 
-- Hanya build assembleRelease (APK), TANPA AAB
-- Signing: temp keystore otomatis (hapus secrets KEYSTORE_* kalau masih error password)
-- Package: com.meimo.app + icon custom (dari patch sebelumnya)
+Icon launcher di-generate ulang dari assets/icons/icon-512.png
+- FULL (cover, tanpa padding)
+- Semua densitas mdpi..xxxhdpi
 
 Apply:
-  unzip -o meimo-patch-v1.24.0-apk-only.zip
-  git add .
-  git commit -m "build: release APK only (no AAB)"
+  unzip -o meimo-patch-v1.24.0-icon-full.zip
+  git add android-patches/icons/
+  git commit -m "fix: full-bleed app icon from icon-512"
   git push
-
-Download artifact: meimo-release-apk
