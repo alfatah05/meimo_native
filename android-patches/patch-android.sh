@@ -51,7 +51,6 @@ if [ -d "android-patches/icons" ] && [ -d "$RES" ]; then
   fi
   echo "[patch] icons installed (legacy mipmap)"
 fi
-fi
 
 MANIFEST="android/app/src/main/AndroidManifest.xml"
 if [ ! -f "$MANIFEST" ]; then
