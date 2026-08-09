@@ -66,19 +66,46 @@ async function boot() {
     ? documentService.loadNote(noteId)
     : Promise.resolve(null);
 
+  // Tunggu animasi page-in SELESAI total sebelum mutasi DOM berat.
+  // Card-style punya ~25 swatch clip-path — kalau di-render di tengah
+  // animasi, frame drop → terasa "patah-patah" (page lain tidak kena).
   try {
     if (window.__MEIMO_SPA__) {
       const { waitForPageTransition } = await import("../router.js");
       await Promise.race([
         waitForPageTransition(),
-        new Promise((r) => setTimeout(r, 420)),
+        new Promise((r) => setTimeout(r, 500)),
       ]);
-    } else if (typeof document.startViewTransition === "function") {
-      // Biarkan page-in (~380ms) jalan di atas skeleton; jangan kerja berat.
-      await new Promise((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(r))
-      );
-      await new Promise((r) => setTimeout(r, 320));
+    } else {
+      // Cross-document View Transition (multi-page Capacitor):
+      // pagereveal.viewTransition.finished = animasi page-in benar-benar usai.
+      await new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          resolve();
+        };
+        const onReveal = (e) => {
+          window.removeEventListener("pagereveal", onReveal);
+          if (e && e.viewTransition && e.viewTransition.finished) {
+            e.viewTransition.finished.then(finish).catch(finish);
+            // Safety: duration-page-in = 380ms + buffer
+            setTimeout(finish, 520);
+          } else {
+            // Tidak ada VT (atau browser lama) — tunggu durasi animasi CSS
+            setTimeout(finish, 420);
+          }
+        };
+        // pagereveal bisa sudah terpicu sebelum listener terpasang
+        if (window.__MEIMO_PAGE_REVEAL__) {
+          onReveal(window.__MEIMO_PAGE_REVEAL__);
+        } else {
+          window.addEventListener("pagereveal", onReveal);
+          // Fallback absolut
+          setTimeout(finish, 520);
+        }
+      });
     }
   } catch (_) {
     /* ignore — jangan gagalkan boot karena helper transisi */
@@ -411,14 +438,24 @@ async function boot() {
   });
 
   renderFontSelect();
-  renderEdgeShapeList();
   renderBgColorList();
   if (draft.bgColor) bgColorCustom.value = draft.bgColor;
 
-  // Jangan blok UI menunggu font. Render preview sekarang; refresh lagi
-  // setelah priority font ready (supaya title font tampil benar).
+  // Preview dulu (1 kartu) — ringan. Edge shapes (25 clip-path) ditunda
+  // 1–2 frame supaya tidak tabrakan dengan sisa compositing page-in.
   renderPreview();
   if (skeleton) skeleton.hidden = true;
+
+  const scheduleEdge = (fn) => {
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(() => fn(), { timeout: 200 });
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(fn));
+    }
+  };
+  scheduleEdge(() => {
+    renderEdgeShapeList();
+  });
 
   // Priority font (max ~2s) lalu re-render preview bila family berubah.
   Promise.race([

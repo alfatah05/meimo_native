@@ -121,9 +121,13 @@
   gap: var(--space-sm);
   overflow-x: auto;
   padding-bottom: 2px; /* ruang kecil biar box-shadow/border item aktif tidak kepotong */
+  /* Isolasi layout — 25 clip-path swatch tidak dirty layout page saat scroll/animasi */
+  contain: layout style;
+  content-visibility: auto;
 }
 
 .card-style-shape-item {
+  contain: layout paint;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;

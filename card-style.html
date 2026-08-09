@@ -40,6 +40,11 @@
       if (meta) meta.setAttribute("content", THEME_COLORS[t] || THEME_COLORS.light);
     } catch (e) {}
   })();
+  // Capture pagereveal SEBELUM module boot — event bisa terpicu sangat awal
+  // di cross-document View Transition, sebelum card-style.js sempat listen.
+  window.addEventListener("pagereveal", function (e) {
+    window.__MEIMO_PAGE_REVEAL__ = e;
+  });
 </script>
 <link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">

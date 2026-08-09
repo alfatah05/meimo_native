@@ -87,6 +87,34 @@ function invalidateInstalledCache() {
   installedMetaPromise = null;
 }
 
+
+function upsertInstalledCache(record) {
+  if (!record || !record.id) return;
+  const meta = stripToMeta(record);
+  if (installedMetaCache) {
+    const i = installedMetaCache.findIndex((f) => f.id === record.id);
+    if (i >= 0) installedMetaCache[i] = meta;
+    else installedMetaCache.push(meta);
+  }
+  if (installedFullCache) {
+    const i = installedFullCache.findIndex((f) => f.id === record.id);
+    if (i >= 0) installedFullCache[i] = record;
+    else installedFullCache.push(record);
+  }
+  // Kalau cache belum pernah di-warm, biarkan null — next read dari storage
+  // akan dapat daftar lengkap termasuk record baru yang sudah di-put.
+}
+
+function removeFromInstalledCache(id) {
+  if (installedMetaCache) {
+    installedMetaCache = installedMetaCache.filter((f) => f.id !== id);
+  }
+  if (installedFullCache) {
+    installedFullCache = installedFullCache.filter((f) => f.id !== id);
+  }
+}
+
+
 /** Ambil seluruh font kustom yang sudah diunduh (record lengkap termasuk bytes). */
 export async function getInstalledFonts() {
   if (installedFullCache) return installedFullCache;
@@ -513,19 +541,17 @@ export async function installFont(libraryFont) {
   });
 
   await fontsRepository.putFont(record);
-  invalidateInstalledCache();
   await loadFontRecordFaces(record);
-  // Warm caches with new record
-  installedFullCache = installedFullCache || [];
-  installedFullCache.push(record);
-  installedMetaCache = (installedMetaCache || []).concat([stripToMeta(record)]);
+  // Upsert ke cache — JANGAN invalidate+replace (bug: cache cuma berisi
+  // font terakhir yang di-install, font lain "hilang" dari dropdown/editor).
+  upsertInstalledCache(record);
   return record;
 }
 
 /** Hapus font kustom yang sudah diunduh dari penyimpanan lokal (IndexedDB). */
 export async function removeFont(id) {
   await fontsRepository.deleteFont(id);
-  invalidateInstalledCache();
+  removeFromInstalledCache(id);
   // Catatan: tidak ada API standar untuk "melepas" FontFace yang sudah
   // sempat ditambahkan ke `document.fonts` pada sesi yang sedang berjalan
   // ini — teks yang kebetulan masih memakai font ini di layar saat ini
@@ -564,7 +590,7 @@ function deriveNameFromFilename(filename) {
  * `document.fonts`).
  */
 async function ensureUniqueFamily(baseName) {
-  const [installed] = await Promise.all([getInstalledFonts()]);
+  const installed = await getInstalledFontsMeta();
   const taken = new Set([
     ...BUILTIN_FONTS.map((f) => f.family.toLowerCase()),
     ...installed.map((f) => f.family.toLowerCase()),
@@ -617,11 +643,8 @@ export async function installCustomFont(file) {
   });
 
   await fontsRepository.putFont(record);
-  invalidateInstalledCache();
   document.fonts.add(face);
   loadedFaceKeys.add(faceKey(family, 400, "normal"));
-  installedFullCache = installedFullCache || [];
-  installedFullCache.push(record);
-  installedMetaCache = (installedMetaCache || []).concat([stripToMeta(record)]);
+  upsertInstalledCache(record);
   return record;
 }
