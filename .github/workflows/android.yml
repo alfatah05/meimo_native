@@ -51,14 +51,13 @@ jobs:
           chmod +x android-patches/patch-android.sh
           bash android-patches/patch-android.sh
 
-      - name: Verify package + icons + mic permission
+      - name: Verify package + icons + mic
         run: |
           grep -n "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml
           grep -n "applicationId\|namespace\|versionCode\|versionName" android/app/build.gradle 2>/dev/null || true
-          grep -n "applicationId\|namespace\|versionCode\|versionName" android/app/build.gradle.kts 2>/dev/null || true
           test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           test -f android/app/src/main/java/com/meimo/app/MainActivity.java
-          echo "VERIFY OK com.meimo.app"
+          echo "VERIFY OK"
 
       - name: Setup release signing
         env:
@@ -69,12 +68,26 @@ jobs:
         run: |
           chmod +x android-patches/setup-signing.sh
           bash android-patches/setup-signing.sh
+          echo "---- app/build.gradle (signing section) ----"
+          grep -n -A30 "signingConfigs" android/app/build.gradle || true
+          echo "---- keystore files ----"
+          ls -la android/keystore/
 
       - name: Build Release APK + AAB
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+          set +e
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace --info 2>&1 | tee /tmp/gradle-release.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "======== GRADLE FAILURE SUMMARY ========"
+            grep -n -i -E "FAILURE|error:|What went wrong|Execution failed|AAPT|resource|signing|not found|Exception" /tmp/gradle-release.log | tail -80
+            echo "======== TAIL LOG ========"
+            tail -100 /tmp/gradle-release.log
+            exit "$STATUS"
+          fi
 
       - name: List outputs
         run: find android/app/build/outputs -type f \( -name "*.apk" -o -name "*.aab" \) -ls

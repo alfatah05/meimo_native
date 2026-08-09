@@ -23,56 +23,34 @@ for f in MeimoSystemBarsPlugin.java MeimoFileSaverPlugin.java NavigationBarPlugi
   fi
 done
 
-# --- Icons ---
+# --- Icons (simple mipmap, no fragile adaptive XML) ---
 RES="android/app/src/main/res"
 if [ -d "android-patches/icons" ] && [ -d "$RES" ]; then
+  # Remove anydpi adaptive that may reference missing drawables
+  rm -rf "$RES/mipmap-anydpi-v26" 2>/dev/null || true
+
   for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
     mkdir -p "$RES/mipmap-$dens"
-    if [ -f "android-patches/icons/ic_launcher_${dens}.png" ]; then
-      cp "android-patches/icons/ic_launcher_${dens}.png" "$RES/mipmap-$dens/ic_launcher.png"
-      cp "android-patches/icons/ic_launcher_round_${dens}.png" "$RES/mipmap-$dens/ic_launcher_round.png"
-      # foreground copy for adaptive if needed
-      cp "android-patches/icons/ic_launcher_${dens}.png" "$RES/mipmap-$dens/ic_launcher_foreground.png"
+    SRC="android-patches/icons/ic_launcher_${dens}.png"
+    if [ -f "$SRC" ]; then
+      cp "$SRC" "$RES/mipmap-$dens/ic_launcher.png"
+      cp "$SRC" "$RES/mipmap-$dens/ic_launcher_round.png"
+      cp "$SRC" "$RES/mipmap-$dens/ic_launcher_foreground.png"
       echo "[patch] icon mipmap-$dens"
     fi
   done
-  # Adaptive icon XML
-  mkdir -p "$RES/mipmap-anydpi-v26"
-  cat > "$RES/mipmap-anydpi-v26/ic_launcher.xml" << 'XML'
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-</adaptive-icon>
-XML
-  cat > "$RES/mipmap-anydpi-v26/ic_launcher_round.xml" << 'XML'
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-</adaptive-icon>
-XML
+
+  # Ensure colors.xml has background color (harmless if adaptive removed)
   mkdir -p "$RES/values"
-  # color for adaptive background
-  if [ -f "$RES/values/ic_launcher_background.xml" ]; then
-    :
-  fi
-  if ! grep -q "ic_launcher_background" "$RES/values/colors.xml" 2>/dev/null; then
-    if [ -f "$RES/values/colors.xml" ]; then
+  if [ -f "$RES/values/colors.xml" ]; then
+    if ! grep -q "ic_launcher_background" "$RES/values/colors.xml"; then
       sed -i 's|</resources>|    <color name="ic_launcher_background">#1E1E1E</color>\n</resources>|' "$RES/values/colors.xml" || true
-    else
-      cat > "$RES/values/colors.xml" << 'COLORS'
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="ic_launcher_background">#1E1E1E</color>
-</resources>
-COLORS
     fi
+  else
+    printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources>' '    <color name="ic_launcher_background">#1E1E1E</color>' '</resources>' > "$RES/values/colors.xml"
   fi
-  # Also copy xxxhdpi as generic foreground in drawable
-  mkdir -p "$RES/drawable"
-  cp "android-patches/icons/ic_launcher_foreground.png" "$RES/drawable/ic_launcher_foreground.png" 2>/dev/null || true
-  echo "[patch] adaptive icons configured"
+  echo "[patch] icons installed (legacy mipmap)"
+fi
 fi
 
 MANIFEST="android/app/src/main/AndroidManifest.xml"

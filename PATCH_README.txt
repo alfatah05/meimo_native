@@ -1,21 +1,16 @@
-Meimo Release Patch v1.24.0
-===========================
+Meimo patch v1.24.0-release-fix1
 
-- Package name: com.meimo.app (bukan com.meimo.notes)
-- Icon aplikasi: custom (kucing putih)
-- Build: release APK + AAB (Play Store)
-- versionName 1.24.0 / versionCode 12400
+Fix build release APK/AAB gagal:
+- signing: path keystore absolut + inject signingConfigs lebih aman
+- minifyEnabled false (hindari R8 tanpa proguard rules)
+- icon: hapus adaptive anydpi yang sering bikin AAPT error, pakai mipmap biasa
+- CI: cetak ringkasan error Gradle yang relevan
 
-Apply di root repo:
-  unzip -o meimo-patch-v1.24.0-release.zip
+Apply:
+  unzip -o meimo-patch-v1.24.0-release-fix1.zip
   git add .
-  git commit -m "release: com.meimo.app + custom icon + Play Store AAB (1.24.0)"
+  git commit -m "fix: release build signing + icons (1.24.0-fix1)"
   git push
 
-Setelah Actions selesai, download:
-  - meimo-release-aab  → upload Play Console
-  - meimo-release-apk  → uji install
-
-Baca PLAY_STORE.md untuk signing secrets & checklist Play Store.
-
-PENTING: uninstall app lama (com.meimo.notes) dulu — package name berubah.
+Kalau masih gagal, buka log step "Build Release APK + AAB"
+bagian "GRADLE FAILURE SUMMARY" dan kirim isinya.
