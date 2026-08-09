@@ -58,48 +58,33 @@ async function boot() {
 
   const noteId = getNoteIdFromUrl();
 
-  // Mulai load data SEGERA (paralel dengan animasi page-in), tapi jangan
-  // mutasi DOM dulu. FontFace API + render swatch clip-path kompleks
-  // sebelumnya jalan di tengah animasi → naik-nya terasa lambat/berat.
-  const dataPromise = (async () => {
-    const note = noteId ? await documentService.loadNote(noteId) : null;
-    const used = note
-      ? extractFontFamiliesFromHtml(
-          `${note.title || ""} ${note.body || note.content || note.html || ""}`
-        )
-      : [];
-    // Font prioritas dulu; sisa di idle — UI card style tidak tunggu semua font.
-    await ensureInstalledFontsLoaded({
-      families: used,
-      deferRest: true,
-      concurrency: 2,
-    });
-    return [note];
-  })();
+  // 1) Load note SEGERA (ringan).
+  // 2) JANGAN load semua font di sini — itu biang 15 detik saat banyak font.
+  // 3) Tunggu page transition SELESAI sebelum mutasi DOM berat (biar animasi
+  //    tidak patah karena main-thread keisi FontFace / clip-path).
+  const notePromise = noteId
+    ? documentService.loadNote(noteId)
+    : Promise.resolve(null);
 
-  // Tunggu animasi page transition selesai (SPA: router.waitForPageTransition;
-  // multi-page / tanpa VT: langsung lanjut). Fallback timeout supaya tidak
-  // menggantung di browser aneh.
   try {
     if (window.__MEIMO_SPA__) {
       const { waitForPageTransition } = await import("../router.js");
       await Promise.race([
         waitForPageTransition(),
-        new Promise((r) => setTimeout(r, 450)),
+        new Promise((r) => setTimeout(r, 420)),
       ]);
     } else if (typeof document.startViewTransition === "function") {
-      // Cross-document VT: berikan ruang satu frame + sedikit waktu agar
-      // animasi page-in (≈380ms) sempat berjalan di atas skeleton dulu.
+      // Biarkan page-in (~380ms) jalan di atas skeleton; jangan kerja berat.
       await new Promise((r) =>
         requestAnimationFrame(() => requestAnimationFrame(r))
       );
-      await new Promise((r) => setTimeout(r, 280));
+      await new Promise((r) => setTimeout(r, 320));
     }
   } catch (_) {
     /* ignore — jangan gagalkan boot karena helper transisi */
   }
 
-  const [note] = await dataPromise;
+  const note = await notePromise;
   if (!note) {
     if (window.__MEIMO_SPA__) {
       import("../router.js").then((r) => {
@@ -112,7 +97,24 @@ async function boot() {
     return;
   }
 
+  // Meta list saja (tanpa bytes) — cepat, cukup untuk dropdown.
   const fonts = await getAvailableFonts();
+
+  // Prioritas FontFace: title font draft + family yang dipakai di note.
+  // Sisanya di background idle — jangan blok first paint.
+  const draftTitleFont =
+    (note.metadata && note.metadata.cardStyle && note.metadata.cardStyle.titleFont) || null;
+  const used = extractFontFamiliesFromHtml(
+    `${note.title || ""} ${note.body || note.content || note.html || ""}`
+  );
+  const priorityFamilies = [...new Set([draftTitleFont, ...used].filter(Boolean))];
+  // Fire-and-forget setelah UI siap; await singkat max 1 family biar preview
+  // title font tidak fallback ke sistem.
+  const priorityFontPromise = ensureInstalledFontsLoaded({
+    families: priorityFamilies,
+    deferRest: true,
+    concurrency: 1,
+  });
 
   const originalCardStyle = note.metadata.cardStyle
     ? { ...createDefaultCardStyle(), ...note.metadata.cardStyle }
@@ -412,13 +414,19 @@ async function boot() {
   renderEdgeShapeList();
   renderBgColorList();
   if (draft.bgColor) bgColorCustom.value = draft.bgColor;
-  renderPreview();
 
-  // Skeleton cuma perlu tampil sekali di load pertama (biar tidak "kedip
-  // putih" pas navigasi ke halaman ini) — begitu semua section sudah
-  // dirender dengan data asli, sembunyikan permanen (lihat pola yang sama
-  // di fonts/font-manager.js).
+  // Jangan blok UI menunggu font. Render preview sekarang; refresh lagi
+  // setelah priority font ready (supaya title font tampil benar).
+  renderPreview();
   if (skeleton) skeleton.hidden = true;
+
+  // Priority font (max ~2s) lalu re-render preview bila family berubah.
+  Promise.race([
+    priorityFontPromise,
+    new Promise((r) => setTimeout(r, 2000)),
+  ]).then(() => {
+    renderPreview();
+  }).catch(() => {});
 }
 
 /** Init untuk SPA / multi-page. */

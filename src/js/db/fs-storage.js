@@ -213,6 +213,25 @@ export async function deleteAssetsByNoteIdFS(noteId) {
 }
 
 /* ---------- Fonts ---------- */
+function fontMetaFromRaw(raw) {
+  if (!raw) return null;
+  return {
+    id: raw.id,
+    name: raw.name,
+    family: raw.family,
+    category: raw.category || "",
+    source: raw.source || "library",
+    installedAt: raw.installedAt,
+    files: Array.isArray(raw.files)
+      ? raw.files.map((f) => ({
+          weight: f.weight || 400,
+          style: f.style || "normal",
+          mimeType: f.mimeType || "",
+        }))
+      : [],
+  };
+}
+
 export async function putFontFS(font) {
   // font.files[].bytes → base64
   const serializable = {
@@ -227,6 +246,8 @@ export async function putFontFS(font) {
   // hapus bytes mentah dari salinan
   for (const f of serializable.files) delete f.bytes;
   await writeJson(`fonts/${font.id}.json`, serializable);
+  // Meta ringan terpisah — getAllFontsMetaFS tidak perlu decode base64.
+  await writeJson(`fonts/${font.id}.meta.json`, fontMetaFromRaw(font));
   return font;
 }
 
@@ -244,21 +265,76 @@ export async function getFontByIdFS(id) {
   };
 }
 
+/** Baca hanya metadata (file .meta.json). Fallback ke full JSON tanpa decode base64. */
+export async function getFontMetaByIdFS(id) {
+  const meta = await readJson(`fonts/${id}.meta.json`);
+  if (meta) return fontMetaFromRaw(meta);
+  // Fallback: parse full file tapi JANGAN decode base64 → ArrayBuffer
+  const raw = await readJson(`fonts/${id}.json`);
+  if (!raw) return undefined;
+  const m = fontMetaFromRaw(raw);
+  // Tulis meta untuk next time
+  try { await writeJson(`fonts/${id}.meta.json`, m); } catch (_) {}
+  return m;
+}
+
+async function mapPoolFS(items, fn, concurrency = 4) {
+  const list = Array.from(items || []);
+  const out = new Array(list.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, Math.max(1, list.length)) }, async () => {
+    while (i < list.length) {
+      const idx = i++;
+      out[idx] = await fn(list[idx]);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+export async function getAllFontsMetaFS() {
+  const files = await listDir("fonts");
+  const ids = [];
+  for (const f of files) {
+    const name = String(f.name || f);
+    // Prefer *.meta.json; kalau belum ada, pakai *.json (bukan *.meta.json)
+    if (name.endsWith(".meta.json")) {
+      ids.push(name.replace(/\.meta\.json$/, ""));
+    }
+  }
+  // Juga id yang cuma punya full .json (belum punya meta)
+  const idSet = new Set(ids);
+  for (const f of files) {
+    const name = String(f.name || f);
+    if (name.endsWith(".json") && !name.endsWith(".meta.json")) {
+      const id = name.replace(/\.json$/, "");
+      if (!idSet.has(id)) {
+        idSet.add(id);
+        ids.push(id);
+      }
+    }
+  }
+  const results = await mapPoolFS(ids, (id) => getFontMetaByIdFS(id), 6);
+  return results.filter(Boolean);
+}
+
 export async function getAllFontsFS() {
   const files = await listDir("fonts");
-  const out = [];
+  const ids = [];
   for (const f of files) {
-    const name = f.name || f;
-    if (!String(name).endsWith(".json")) continue;
-    const id = String(name).replace(/\.json$/, "");
-    const font = await getFontByIdFS(id);
-    if (font) out.push(font);
+    const name = String(f.name || f);
+    if (name.endsWith(".json") && !name.endsWith(".meta.json")) {
+      ids.push(name.replace(/\.json$/, ""));
+    }
   }
-  return out;
+  // Parallel terbatas — sequential dulu sangat lambat saat banyak font
+  const results = await mapPoolFS(ids, (id) => getFontByIdFS(id), 3);
+  return results.filter(Boolean);
 }
 
 export async function deleteFontFS(id) {
   await removeFile(`fonts/${id}.json`);
+  try { await removeFile(`fonts/${id}.meta.json`); } catch (_) {}
 }
 
 /* ---------- Settings (key-value map) ---------- */

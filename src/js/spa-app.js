@@ -326,8 +326,10 @@ async function bootSpa() {
     import("./notes/card-style.js").catch(() => {});
     import("./services/font-service.js")
       .then((m) => {
-        if (m.ensureInstalledFontsLoaded) {
-          m.ensureInstalledFontsLoaded({ deferRest: true, concurrency: 1 }).catch(() => {});
+        // Warm meta cache saja (murah). Jangan FontFace-kan semua font di
+        // background — bikin jank & boros memori saat user install banyak.
+        if (m.getInstalledFontsMeta) {
+          m.getInstalledFontsMeta().catch(() => {});
         }
       })
       .catch(() => {});

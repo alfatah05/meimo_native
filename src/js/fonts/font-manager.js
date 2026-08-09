@@ -12,7 +12,7 @@
 import {
   BUILTIN_FONTS,
   getFontLibrary,
-  getInstalledFonts,
+  getInstalledFontsMeta,
   getUploadedFonts,
   installFont,
   installCustomFont,
@@ -116,9 +116,19 @@ function getPreviewObserver() {
     previewObserver = {
       observe(el) {
         const font = el._previewFont;
+        const installed = !!el._previewInstalled;
         if (!font) return;
-        ensureLibraryFontPreviewLoaded(font).catch(() => {});
+        if (installed) {
+          ensureInstalledFontsLoaded({
+            families: [font.family, font.id],
+            deferRest: true,
+            concurrency: 1,
+          }).catch(() => {});
+        } else {
+          ensureLibraryFontPreviewLoaded(font).catch(() => {});
+        }
         el._previewFont = null;
+        el._previewInstalled = false;
       },
       unobserve() {},
       disconnect() {},
@@ -131,12 +141,23 @@ function getPreviewObserver() {
         if (!entry.isIntersecting) continue;
         const el = entry.target;
         const font = el._previewFont;
+        const installed = !!el._previewInstalled;
         previewObserver.unobserve(el);
         el._previewFont = null;
+        el._previewInstalled = false;
         if (!font) continue;
-        ensureLibraryFontPreviewLoaded(font).catch((err) => {
-          console.error("Gagal pratinjau font:", err);
-        });
+        if (installed) {
+          // Dari storage (IndexedDB/FS) — prioritas family ini saja.
+          ensureInstalledFontsLoaded({
+            families: [font.family, font.id],
+            deferRest: true,
+            concurrency: 1,
+          }).catch((err) => console.error("Gagal load font terpasang:", err));
+        } else {
+          ensureLibraryFontPreviewLoaded(font).catch((err) => {
+            console.error("Gagal pratinjau font:", err);
+          });
+        }
       }
     },
     {
@@ -168,13 +189,11 @@ function createLibraryItem(font, { installed, onChange }) {
   // sesi ini — TIDAK ditulis ke IndexedDB. Begitu berkasnya selesai
   // dimuat, browser otomatis me-render ulang teks ini dengan font asli.
   nameEl.style.fontFamily = `"${font.family}"`;
-  if (!installed) {
-    // Lazy: muat file font preview hanya saat baris terlihat di viewport.
-    // Sebelumnya semua item di halaman di-fetch paralel → buka Font Library lambat.
-    nameEl.dataset.fontPreview = "1";
-    nameEl._previewFont = font;
-    observeFontPreview(nameEl);
-  }
+  // Lazy load face (installed dari storage, atau preview dari URL) saat terlihat.
+  nameEl.dataset.fontPreview = "1";
+  nameEl._previewFont = font;
+  nameEl._previewInstalled = !!installed;
+  observeFontPreview(nameEl);
 
   const actions = createEl("div", { className: "font-item__actions" });
 
@@ -290,13 +309,14 @@ async function boot() {
     builtinList.appendChild(createBuiltinItem(font));
   }
 
-  // Muat ulang @font-face untuk font yang sudah pernah diunduh sebelumnya,
-  // supaya preview nama font di daftar tampil pakai fontnya sendiri.
-  await ensureInstalledFontsLoaded({ deferRest: true, concurrency: 2 });
-
+  // Jangan load SEMUA FontFace di awal — mahal. Meta dulu; faces di-load
+  // lazy per item yang terlihat (installed → ensure by family; library → preview).
   async function load() {
     try {
-      const [library, installedRecords] = await Promise.all([getFontLibrary(), getInstalledFonts()]);
+      const [library, installedRecords] = await Promise.all([
+        getFontLibrary(),
+        getInstalledFontsMeta(),
+      ]);
       const installedIds = new Set(installedRecords.map((f) => f.id));
 
       clearChildren(libraryList);
@@ -346,6 +366,12 @@ async function boot() {
         for (const font of pageItems) {
           uploadedList.appendChild(createUploadedItem(font, { onChange: load }));
         }
+        // Load faces hanya untuk font di halaman ini (bukan semua).
+        ensureInstalledFontsLoaded({
+          families: pageItems.map((f) => f.family || f.id),
+          deferRest: true,
+          concurrency: 1,
+        }).catch(() => {});
         if (uploadedPagination) {
           renderPagination(uploadedPagination, uploadedPage, uploaded.length, (page) => {
             uploadedPage = page;
