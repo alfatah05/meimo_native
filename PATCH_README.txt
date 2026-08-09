@@ -1,14 +1,13 @@
-Meimo patch v1.24.0-release-fix3
+Meimo patch v1.24.0-apk-only
 
-- Signing tidak lagi inject ke tengah build.gradle (sering rusak brace)
-  → apply file terpisah keystore/signing-config.gradle
-- Error log CI filter "Resource missing" (bukan error asli)
-- YAML workflow valid
+- Hanya build assembleRelease (APK), TANPA AAB
+- Signing: temp keystore otomatis (hapus secrets KEYSTORE_* kalau masih error password)
+- Package: com.meimo.app + icon custom (dari patch sebelumnya)
 
 Apply:
-  unzip -o meimo-patch-v1.24.0-release-fix3.zip
+  unzip -o meimo-patch-v1.24.0-apk-only.zip
   git add .
-  git commit -m "fix: safer release signing via signing-config.gradle"
+  git commit -m "build: release APK only (no AAB)"
   git push
 
-Kalau gagal lagi, kirim bagian "WHAT WENT WRONG" dari log.
+Download artifact: meimo-release-apk

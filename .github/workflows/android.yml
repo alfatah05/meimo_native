@@ -1,4 +1,4 @@
-name: Build Android Release
+name: Build Android APK
 
 on:
   push:
@@ -67,44 +67,32 @@ jobs:
         run: |
           chmod +x android-patches/setup-signing.sh
           bash android-patches/setup-signing.sh
-          echo "---- app/build.gradle tail ----"
-          tail -30 android/app/build.gradle
-          echo "---- signing.properties ----"
-          cat android/keystore/signing.properties
 
-      - name: Build Release APK + AAB
+      - name: Build Release APK
         working-directory: android
         run: |
           chmod +x gradlew
           set +e
-          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-release.log
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-release.log
           STATUS=${PIPESTATUS[0]}
           set -e
           if [ "$STATUS" -ne 0 ]; then
             echo "======== WHAT WENT WRONG ========"
             awk '/What went wrong:/{flag=1} flag{print} /Try:/{if(flag){exit}}' /tmp/gradle-release.log || true
             echo "======== OTHER ERRORS ========"
-            grep -n "Execution failed\|Could not\|AAPT\|Signing\|keystore\|Exception:" /tmp/gradle-release.log | grep -v "Resource missing" | tail -60 || true
+            grep -n "Execution failed\|Could not\|AAPT\|Signing\|keystore\|Exception:" /tmp/gradle-release.log | grep -v "Resource missing" | tail -40 || true
             echo "======== TAIL ========"
-            tail -80 /tmp/gradle-release.log
+            tail -40 /tmp/gradle-release.log
             exit "$STATUS"
           fi
 
       - name: List outputs
-        run: find android/app/build/outputs -type f \( -name "*.apk" -o -name "*.aab" \) -ls
+        run: find android/app/build/outputs/apk -type f -name "*.apk" -ls
 
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: meimo-release-apk
           path: android/app/build/outputs/apk/release/*.apk
-          retention-days: 30
-          if-no-files-found: error
-
-      - name: Upload Release AAB (Play Store)
-        uses: actions/upload-artifact@v4
-        with:
-          name: meimo-release-aab
-          path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
           if-no-files-found: error
