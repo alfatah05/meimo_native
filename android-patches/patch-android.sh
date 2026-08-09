@@ -23,11 +23,13 @@ for f in MeimoSystemBarsPlugin.java MeimoFileSaverPlugin.java NavigationBarPlugi
   fi
 done
 
-# --- Icons (simple mipmap, no fragile adaptive XML) ---
+# --- Icons FULL (no adaptive = no safe-zone padding) ---
 RES="android/app/src/main/res"
 if [ -d "android-patches/icons" ] && [ -d "$RES" ]; then
-  # Remove anydpi adaptive that may reference missing drawables
+  # Adaptive icon = sumber "padding" di launcher. Hapus total.
   rm -rf "$RES/mipmap-anydpi-v26" 2>/dev/null || true
+  rm -f "$RES/mipmap-anydpi-v26"/* 2>/dev/null || true
+  find "$RES" -name "ic_launcher*.xml" -delete 2>/dev/null || true
 
   for dens in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
     mkdir -p "$RES/mipmap-$dens"
@@ -36,22 +38,26 @@ if [ -d "android-patches/icons" ] && [ -d "$RES" ]; then
       cp "$SRC" "$RES/mipmap-$dens/ic_launcher.png"
       cp "$SRC" "$RES/mipmap-$dens/ic_launcher_round.png"
       cp "$SRC" "$RES/mipmap-$dens/ic_launcher_foreground.png"
-      echo "[patch] icon mipmap-$dens"
+      # hapus .webp default Capacitor jika ada
+      rm -f "$RES/mipmap-$dens/ic_launcher.webp" "$RES/mipmap-$dens/ic_launcher_round.webp" "$RES/mipmap-$dens/ic_launcher_foreground.webp" 2>/dev/null || true
+      echo "[patch] icon mipmap-$dens FULL"
     fi
   done
 
   # Capacitor already ships values/ic_launcher_background.xml — JANGAN
   # menambah color yang sama di colors.xml (Duplicate resources).
   # Hanya update warna file resmi jika ada.
-  if [ -f "$RES/values/ic_launcher_background.xml" ]; then
-    cat > "$RES/values/ic_launcher_background.xml" << 'COLORXML'
+  mkdir -p "$RES/values"
+  # Selalu tulis background gelap (jangan putih default)
+  cat > "$RES/values/ic_launcher_background.xml" << 'COLORXML'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#1E1E1E</color>
 </resources>
 COLORXML
-    echo "[patch] updated ic_launcher_background.xml color"
-  fi
+  echo "[patch] ic_launcher_background.xml = #1E1E1E"
+  # Jangan biarkan adaptive icon kembali (bikin "padding" aman ~18%)
+  rm -rf "$RES/mipmap-anydpi-v26" 2>/dev/null || true
   # Pastikan colors.xml TIDAK berisi ic_launcher_background
   if [ -f "$RES/values/colors.xml" ] && grep -q "ic_launcher_background" "$RES/values/colors.xml"; then
     python3 - <<'PY2'

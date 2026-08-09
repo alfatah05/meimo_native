@@ -1,11 +1,13 @@
-Meimo patch v1.24.0-icon-full
+Meimo patch v1.24.0-icon-user
 
-Icon launcher di-generate ulang dari assets/icons/icon-512.png
-- FULL (cover, tanpa padding)
-- Semua densitas mdpi..xxxhdpi
+Ganti SEMUA icon dari icon-192.zip (asli, TANPA resize).
+- assets/icons/* diganti total
+- android-patches/icons/* diganti total (launcher pakai icon-512 apa adanya)
 
 Apply:
-  unzip -o meimo-patch-v1.24.0-icon-full.zip
-  git add android-patches/icons/
-  git commit -m "fix: full-bleed app icon from icon-512"
+  unzip -o meimo-patch-v1.24.0-icon-user.zip
+  git add assets/icons/ android-patches/icons/ android-patches/patch-android.sh
+  git commit -m "icons: replace all with user-provided icon-192.zip (no resize)"
   git push
+
+Uninstall app di HP, install APK baru.
