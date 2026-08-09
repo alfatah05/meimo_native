@@ -54,8 +54,7 @@
 <link rel="stylesheet" href="/src/css/base.css">
 <link rel="stylesheet" href="/src/css/typography.css">
 <link rel="stylesheet" href="/src/css/layout.css">
-<link rel="stylesheet" href="/src/css/notes-list.css">
-<link rel="stylesheet" href="/src/css/toolbar.css">
+<!-- notes-list + toolbar: cuma butuh untuk preview note-card, di-load setelah VT -->
 <link rel="stylesheet" href="/src/css/animations.css">
 <link rel="stylesheet" href="/src/css/responsive.css">
 <link rel="stylesheet" href="/src/css/components.css">
@@ -96,38 +95,12 @@
          Sampah). Ditampilkan by default sejak first paint (tanpa nunggu
          JS), disembunyikan begitu render pertama selesai (lihat boot()
          di card-style.js). -->
-    <div id="cardStyleSkeleton" class="card-style-skeleton skeleton-overlay" aria-hidden="true">
-      <div class="card-style-skeleton__preview">
-        <div class="skeleton-bar card-style-skeleton__preview-card"></div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="skeleton-bar card-style-skeleton__select"></div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="card-style-skeleton__shapes">
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-          <div class="skeleton-bar card-style-skeleton__shape"></div>
-        </div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="card-style-skeleton__colors">
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-          <div class="skeleton-bar card-style-skeleton__color"></div>
-        </div>
-      </div>
-      <div>
-        <div class="skeleton-bar card-style-skeleton__label"></div>
-        <div class="skeleton-bar card-style-skeleton__upload-btn"></div>
-      </div>
+    <div id="cardStyleSkeleton" class="list-skeleton skeleton-overlay card-style-skeleton--simple" aria-hidden="true">
+      <!-- Skeleton super ringan: 3 bar statis, TANPA shimmer infinite.
+           Shimmer + grid kompleks sebelumnya tabrakan dengan View Transition. -->
+      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border)"></div>
+      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border);width:85%"></div>
+      <div class="skeleton-bar list-skeleton__row" style="animation:none;background:var(--color-border);width:70%"></div>
     </div>
 
     <section class="section">
@@ -200,25 +173,79 @@
       </div>
     </section>
 
-    <!-- Actions di alur konten (bukan fixed bar) — scroll ke bawah untuk submit.
-         Menghindari position:fixed yang bikin View Transition patah-patah. -->
-    <section class="section card-style-actions">
-      <div class="card-style-actions__row">
-        <button type="button" id="resetBtn" class="modal-btn modal-btn--ghost" data-i18n="cardStyle.reset">Reset</button>
-        <button type="button" id="saveBtn" class="modal-btn modal-btn--primary" data-i18n="cardStyle.save">Save</button>
-      </div>
-    </section>
-
   </main>
+
+  <!-- ============ ACTION BAR ============ -->
+  <div class="card-style-actionbar">
+    <button type="button" id="resetBtn" class="modal-btn modal-btn--ghost" data-i18n="cardStyle.reset">Reset</button>
+    <button type="button" id="saveBtn" class="modal-btn modal-btn--primary" data-i18n="cardStyle.save">Save</button>
+  </div>
 
 </div>
 
-<script type="module" src="/src/js/notes/card-style.js"></script>
+<!-- Modul berat (note-card, font-service, presets clip-path, document-service)
+     SENGAJA di-import SETELAH View Transition selesai. Kalau di-load paralel
+     dengan animasi page-in, parse/compile JS di main thread bikin frame drop
+     — terasa "patah-patah" selama skeleton masih tampil. Page font-manager/
+     editor import graph-nya lebih ringan jadi tidak kena. -->
+<script type="module">
+(async function () {
+  function waitVt() {
+    return new Promise(function (resolve) {
+      var done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        resolve();
+      }
+      var e = window.__MEIMO_PAGE_REVEAL__;
+      if (e && e.viewTransition && e.viewTransition.finished) {
+        e.viewTransition.finished.then(finish).catch(finish);
+        setTimeout(finish, 500);
+        return;
+      }
+      function onReveal(ev) {
+        window.removeEventListener("pagereveal", onReveal);
+        window.__MEIMO_PAGE_REVEAL__ = ev;
+        if (ev && ev.viewTransition && ev.viewTransition.finished) {
+          ev.viewTransition.finished.then(finish).catch(finish);
+          setTimeout(finish, 500);
+        } else {
+          setTimeout(finish, 400);
+        }
+      }
+      window.addEventListener("pagereveal", onReveal);
+      setTimeout(finish, 500);
+    });
+  }
 
-<!-- ============ PWA: Service Worker (mode offline) ============ -->
-<script type="module" src="/src/js/pwa/sw-register.js"></script>
-<script type="module" src="/src/js/pwa/install-prompt.js"></script>
-<script type="module" src="/src/js/utils/native-feel.js"></script>
+  await waitVt();
+
+  // CSS yang cuma dipakai preview kartu — load setelah animasi biar parse CSS
+  // tidak tabrakan dengan frame View Transition.
+  function loadCss(href) {
+    return new Promise(function (resolve) {
+      var l = document.createElement("link");
+      l.rel = "stylesheet";
+      l.href = href;
+      l.onload = function () { resolve(); };
+      l.onerror = function () { resolve(); };
+      document.head.appendChild(l);
+    });
+  }
+  await Promise.all([
+    loadCss("/src/css/notes-list.css"),
+    loadCss("/src/css/toolbar.css"),
+  ]);
+
+  // Baru sekarang load modul berat + boot
+  await import("/src/js/notes/card-style.js");
+  // PWA helpers (ringan) — boleh paralel setelah page settled
+  import("/src/js/pwa/sw-register.js").catch(function () {});
+  import("/src/js/pwa/install-prompt.js").catch(function () {});
+  import("/src/js/utils/native-feel.js").catch(function () {});
+})();
+</script>
 
 </body>
 </html>

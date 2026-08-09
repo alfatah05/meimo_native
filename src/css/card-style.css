@@ -6,8 +6,9 @@
    nempel di bawah layar.
    ========================================================================== */
 
+/* Ruang ekstra di bawah supaya action bar fixed tidak menutupi konten. */
 .card-style-page {
-  padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(var(--space-4xl) + 64px);
 }
 
 /* ---- Pratinjau ---- */
@@ -341,17 +342,22 @@
 
 /* ---- Action bar (Setel Ulang / Simpan) ---- */
 
-/* Tombol Reset/Simpan di alur konten (bukan fixed bottom bar). */
-.card-style-actions {
-  margin-top: var(--space-lg);
-  padding-top: var(--space-md);
-  border-top: 1px solid var(--color-border);
-}
-.card-style-actions__row {
+/* ---- Action bar (Setel Ulang / Simpan) ---- */
+.card-style-actionbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky);
   display: flex;
   gap: var(--space-sm);
+  padding: var(--space-md);
+  padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
+  background-color: var(--color-bg);
+  border-top: 1px solid var(--color-border);
 }
-.card-style-actions__row .modal-btn {
+
+.card-style-actionbar .modal-btn {
   flex: 1;
 }
 
