@@ -170,25 +170,26 @@ async function ensureEditor() {
  */
 async function ensureSecondary(name, importPath, initExport, opts = {}) {
   // 1) Restore template (skeleton terlihat lagi) + tampilkan view SEGERA
-  //    (bagian sync ini sudah dipanggil di onRoute; tetap aman dipanggil ulang)
   restoreTemplate(name);
   showView(name);
 
-  // 2) Mulai fetch modul segera (paralel dengan animasi)
-  const modPromise = import(importPath);
-
-  // 3) Untuk halaman berat: tunggu page transition selesai dulu supaya
-  //    mutasi DOM di init tidak tabrakan dengan animasi translateY.
+  // 2) Halaman berat (card-style): JANGAN import modul selama View Transition.
+  //    Parse/compile note-card + presets + font-service di main thread
+  //    tabrakan dengan animasi page-in → patah-patah selama skeleton tampil.
   if (opts.waitTransition) {
     try {
       const { waitForPageTransition } = await import("./router.js");
-      await waitForPageTransition();
+      await Promise.race([
+        waitForPageTransition(),
+        new Promise((r) => setTimeout(r, 500)),
+      ]);
     } catch (_) {
       /* ignore */
     }
   }
 
-  const mod = await modPromise;
+  // 3) Baru sekarang fetch + init modul
+  const mod = await import(importPath);
   if (typeof mod[initExport] === "function") {
     await mod[initExport]();
   }

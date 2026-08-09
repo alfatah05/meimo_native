@@ -194,7 +194,17 @@ export function navigate(to, { replace = false } = {}) {
     }
   };
 
-  runWithViewTransition(apply);
+  const vt = runWithViewTransition(apply);
+  // Tandai settle setelah VT — dipakai card-style untuk reveal fixed bar.
+  if (route.name === "card-style") {
+    if (vt && vt.finished) {
+      vt.finished.catch(() => {}).finally(() => {
+        document.documentElement.classList.add("is-vt-settled");
+      });
+    } else {
+      document.documentElement.classList.add("is-vt-settled");
+    }
+  }
 }
 
 export function getRoute() {
