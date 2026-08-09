@@ -100,6 +100,59 @@ function createBuiltinItem(font) {
   return item;
 }
 
+/* ------------------------------------------------------------------ */
+/* Lazy preview Font Library (IntersectionObserver)                   */
+/* ------------------------------------------------------------------ */
+// Satu observer bersama untuk semua baris — lebih hemat daripada observer
+// per item. Begitu elemen masuk viewport, muat @font-face preview sekali
+// (lewat ensureLibraryFontPreviewLoaded yang sudah cache di memori + HTTP
+// force-cache), lalu unobserve supaya tidak jalan lagi.
+let previewObserver = null;
+
+function getPreviewObserver() {
+  if (previewObserver) return previewObserver;
+  if (typeof IntersectionObserver === "undefined") {
+    // Fallback: tanpa IO, muat langsung (masih di-cache di font-service).
+    previewObserver = {
+      observe(el) {
+        const font = el._previewFont;
+        if (!font) return;
+        ensureLibraryFontPreviewLoaded(font).catch(() => {});
+        el._previewFont = null;
+      },
+      unobserve() {},
+      disconnect() {},
+    };
+    return previewObserver;
+  }
+  previewObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const el = entry.target;
+        const font = el._previewFont;
+        previewObserver.unobserve(el);
+        el._previewFont = null;
+        if (!font) continue;
+        ensureLibraryFontPreviewLoaded(font).catch((err) => {
+          console.error("Gagal pratinjau font:", err);
+        });
+      }
+    },
+    {
+      // Mulai load sedikit sebelum baris benar-benar masuk layar
+      rootMargin: "80px 0px",
+      threshold: 0.01,
+    }
+  );
+  return previewObserver;
+}
+
+function observeFontPreview(el) {
+  if (!el || !el._previewFont) return;
+  getPreviewObserver().observe(el);
+}
+
 function createLibraryItem(font, { installed, onChange }) {
   const item = createEl("div", { className: "font-item" });
 

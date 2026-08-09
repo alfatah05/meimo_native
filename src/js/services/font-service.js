@@ -308,6 +308,10 @@ export function extractFontFamiliesFromHtml(html) {
 // pratinjau (belum diunduh/disimpan) di sesi berjalan ini.
 const previewedFaceKeys = new Set();
 
+// Promise in-flight per key — concurrent call untuk font yang sama
+// (scroll cepat / re-render) tidak fetch berkali-kali.
+const previewInflight = new Map();
+
 /**
  * Muat SATU font Font Library (belum tentu sudah diunduh) langsung dari
  * `file.url` sebagai @font-face HANYA untuk pratinjau nama font di halaman
@@ -316,9 +320,14 @@ const previewedFaceKeys = new Set();
  * begitu halaman di-reload dan tidak menambah storage tersimpan.
  * Aman dipanggil berkali-kali untuk font yang sama (di-skip kalau sudah
  * pernah dimuat, baik lewat pratinjau ini maupun karena sudah terpasang).
+ *
+ * Caching:
+ *  - Session (memori): previewedFaceKeys / loadedFaceKeys + inflight map
+ *  - HTTP: fetch dengan cache:"force-cache" supaya browser/Service Worker
+ *    tidak unduh ulang file font yang sudah pernah diload.
  */
 export async function ensureLibraryFontPreviewLoaded(libraryFont) {
-  if (typeof FontFace === "undefined") return;
+  if (typeof FontFace === "undefined" || !libraryFont) return;
   const sourceFiles = Array.isArray(libraryFont.files) ? libraryFont.files : [];
   await Promise.all(
     sourceFiles.map(async (file) => {
@@ -326,20 +335,40 @@ export async function ensureLibraryFontPreviewLoaded(libraryFont) {
       const style = file.style || "normal";
       const key = faceKey(libraryFont.family, weight, style);
       if (loadedFaceKeys.has(key) || previewedFaceKeys.has(key)) return;
-      try {
-        const res = await fetch(file.url);
-        if (!res.ok) throw new Error(`Gagal memuat pratinjau: ${file.url}`);
-        const buffer = await res.arrayBuffer();
-        const face = new FontFace(libraryFont.family, buffer, { weight: String(weight), style });
-        await face.load();
-        document.fonts.add(face);
-        previewedFaceKeys.add(key);
-      } catch (err) {
-        console.error(`Gagal memuat pratinjau font "${libraryFont.family}":`, err);
+
+      // Reuse in-flight promise jika ada (hindari double-fetch).
+      if (previewInflight.has(key)) {
+        await previewInflight.get(key);
+        return;
       }
+
+      const job = (async () => {
+        try {
+          // force-cache: pakai HTTP cache / Service Worker cache dulu.
+          // File font library adalah asset statis (URL fixed) — aman di-cache agresif.
+          const res = await fetch(file.url, { cache: "force-cache" });
+          if (!res.ok) throw new Error(`Gagal memuat pratinjau: ${file.url}`);
+          const buffer = await res.arrayBuffer();
+          const face = new FontFace(libraryFont.family, buffer, {
+            weight: String(weight),
+            style,
+          });
+          await face.load();
+          document.fonts.add(face);
+          previewedFaceKeys.add(key);
+        } catch (err) {
+          console.error(`Gagal memuat pratinjau font "${libraryFont.family}":`, err);
+        } finally {
+          previewInflight.delete(key);
+        }
+      })();
+
+      previewInflight.set(key, job);
+      await job;
     })
   );
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Unduh / hapus font dari Font Library                                */
@@ -358,7 +387,7 @@ export async function installFont(libraryFont) {
 
   const files = [];
   for (const file of sourceFiles) {
-    const res = await fetch(file.url);
+    const res = await fetch(file.url, { cache: "force-cache" });
     if (!res.ok) throw new Error(`Gagal mengunduh berkas font: ${file.url}`);
     // Simpan sebagai ArrayBuffer (bytes), BUKAN Blob mentah — menyimpan
     // Blob langsung ke IndexedDB tidak reliable di sejumlah browser (lihat
