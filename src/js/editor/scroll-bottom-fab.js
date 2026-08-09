@@ -4,14 +4,14 @@
  * Ukuran ~setengah FAB AI, warna senada outline FAB.
  *
  * Saat diklik: scroll ke bawah, lalu begitu scroll benar-benar sampai batas
- * bawah, tunggu 1 detik (biar user sempat lihat posisi akhir dulu) baru
+ * bawah, tunggu 300ms (biar user sempat lihat posisi akhir dulu) baru
  * kursor otomatis difokuskan ke baris paling bawah dokumen.
  */
 
 import { createEl } from "../utils/dom.js";
 
 const NEAR_BOTTOM_PX = 48;
-const FOCUS_END_DELAY_MS = 1000;
+const FOCUS_END_DELAY_MS = 300;
 
 export function initScrollBottomFab({ bodyEl, editor }) {
   const scrollArea = document.querySelector(".note-scroll-area");
@@ -139,7 +139,7 @@ export function initScrollBottomFab({ bodyEl, editor }) {
   document.body.appendChild(fabEl);
 
   scrollArea.addEventListener("scroll", update, { passive: true });
-  // Kalau user scroll manual lagi (menjauh dari bawah) selagi timer 1 detik
+  // Kalau user scroll manual lagi (menjauh dari bawah) selagi timer 300ms
   // masih menunggu, batalkan auto-focus supaya tidak "menyambar" fokus tanpa
   // diminta saat user sedang baca-baca di tengah dokumen.
   scrollArea.addEventListener(

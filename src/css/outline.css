@@ -150,10 +150,12 @@ body.is-block-select-mode .outline-fab {
    "top: 0" secara CSS. Sidebar diberi padding-top setinggi topbar (lihat
    .outline-sidebar di bawah) supaya isinya sendiri juga tidak start
    ketiban topbar secara visual. */
+/* z-index di atas .ai-fab (var(--z-fab)=20) supaya sidebar + backdrop
+   menutupi FAB AI; tetap di bawah .note-topbar (var(--z-toolbar)=30). */
 .outline-overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-fab);
+  z-index: 25;
   pointer-events: none;
 }
 

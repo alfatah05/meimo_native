@@ -1230,6 +1230,10 @@ export function initAiSheet({ editor, state }) {
     return typeof navigator !== "undefined" ? navigator.onLine !== false : true;
   }
 
+  function isOutlineOpen() {
+    return !!document.querySelector(".outline-overlay.is-open");
+  }
+
   function updateFabVisibility() {
     if (document.body.classList.contains("is-ai-generating")) return;
     if (document.body.classList.contains("is-ai-typing")) {
@@ -1242,6 +1246,12 @@ export function initAiSheet({ editor, state }) {
     }
     // Offline: sembunyikan FAB AI (butuh jaringan ke Gemini).
     if (!isOnline()) {
+      requestFabVisible(false);
+      return;
+    }
+    // Sidebar outline terbuka: sembunyikan FAB AI (di belakang / tertutup
+    // backdrop). Muncul lagi saat outline tutup + user fokus editor.
+    if (isOutlineOpen()) {
       requestFabVisible(false);
       return;
     }
@@ -1341,7 +1351,12 @@ export function initAiSheet({ editor, state }) {
     state.onChange(() => updateFabVisibility());
   }
   window.addEventListener("online", updateFabVisibility);
-  window.addEventListener("offline", updateFabVisibility);
+  window.addEventListener("offline", () => {
+    // Langsung tutup — jangan tunggu state lain.
+    clearShowTimers();
+    setFabVisible(false);
+  });
+  document.addEventListener("meimo:outline-change", updateFabVisibility);
 
   // Initial: biasanya belum ada fokus → sembunyi
   updateFabVisibility();

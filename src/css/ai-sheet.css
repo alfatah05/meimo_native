@@ -99,6 +99,14 @@ body.is-block-selection-bar-open .ai-fab {
   translate: 0 calc(-1 * (var(--block-selection-bar-lift, 60px) + var(--space-md)));
 }
 
+body.is-outline-open .ai-fab,
+body:has(.outline-overlay.is-open) .ai-fab {
+  /* Sidebar outline terbuka — jangan tampil di atas/belakang sidebar */
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0.85);
+}
+
 body.is-block-select-mode .ai-fab {
   visibility: hidden;
   pointer-events: none;

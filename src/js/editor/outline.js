@@ -126,16 +126,23 @@ export function initOutline({ state, bodyEl }) {
     isOpen = true;
     renderList();
     overlayEl.hidden = false;
+    document.body.classList.add("is-outline-open");
     // Lepas dari flow render pertama (hidden -> false) dulu sebelum nambah
     // class, supaya transisi transform beneran ke-trigger dari state
     // tersembunyi, bukan langsung "snap" ke state akhir.
-    requestAnimationFrame(() => overlayEl.classList.add("is-open"));
+    requestAnimationFrame(() => {
+      overlayEl.classList.add("is-open");
+      // Beritahu FAB AI (dan listener lain) supaya ikut sembunyi.
+      document.dispatchEvent(new CustomEvent("meimo:outline-change", { detail: { open: true } }));
+    });
   }
 
   function closeSidebar() {
     if (!isOpen) return;
     isOpen = false;
     overlayEl.classList.remove("is-open");
+    document.body.classList.remove("is-outline-open");
+    document.dispatchEvent(new CustomEvent("meimo:outline-change", { detail: { open: false } }));
     setTimeout(() => {
       if (!isOpen) overlayEl.hidden = true;
     }, CLOSE_ANIM_MS);

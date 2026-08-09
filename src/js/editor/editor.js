@@ -885,13 +885,26 @@ export function createEditor({ state, bodyEl, titleEl }) {
     const blocks = state.getDocument().blocks;
     if (!blocks.length) return;
     const lastIndex = blocks.length - 1;
-    bodyEl.focus();
-    selectionApi.setModelSelection(bodyEl, {
+    const endSel = {
       startBlockIndex: lastIndex,
       startOffset: blockTextLength(blocks[lastIndex]),
       endBlockIndex: lastIndex,
       endOffset: blockTextLength(blocks[lastIndex]),
-    });
+    };
+    // Pasang kursor di akhir DULU, baru focus dengan preventScroll.
+    // Kalau focus() dulu, browser sempat restore caret lama (di atas) →
+    // scroll "kedip" ke posisi sebelumnya sebelum loncat ke bawah.
+    selectionApi.setModelSelection(bodyEl, endSel);
+    if (typeof bodyEl.focus === "function") {
+      try {
+        bodyEl.focus({ preventScroll: true });
+      } catch (_) {
+        bodyEl.focus();
+      }
+    }
+    // Pastikan selection tetap di akhir setelah focus (beberapa WebView
+    // mengembalikan caret lama saat elemen dapat fokus).
+    selectionApi.setModelSelection(bodyEl, endSel);
   }
 
   return {
