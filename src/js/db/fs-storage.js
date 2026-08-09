@@ -1,27 +1,29 @@
 /**
  * fs-storage.js
- * Native-only storage backend memakai @capacitor/filesystem di Directory.Data.
- * Struktur:
- *   data/notes/{id}.json
- *   data/assets/{id}.bin + data/assets/{id}.meta.json
- *   data/fonts/{id}.bin + data/fonts/{id}.meta.json
- *   data/settings.json
- *
- * Dipakai otomatis bila Capacitor native; web tetap IndexedDB.
+ * Native-only storage (Capacitor Filesystem Directory.Data).
+ * JANGAN di-static-import dari notes-repository sampai migrasi data siap.
+ * Semua akses plugin lewat getFilesystem() setelah initNative().
  */
 
-import { isNative, Filesystem, Directory, Encoding } from "../native/capacitor-bridge.js";
+import { isNative, getFilesystem } from "../native/capacitor-bridge.js";
 
 const ROOT = "meimo-data";
-const DIR = Directory.Data;
+
+function fsApi() {
+  const { Filesystem, Directory, Encoding } = getFilesystem();
+  if (!Filesystem || !Directory) throw new Error("Filesystem not ready");
+  return { Filesystem, Directory, Encoding, DIR: Directory.Data };
+}
 
 async function ensureDir(path) {
+  const { Filesystem, DIR } = fsApi();
   try {
     await Filesystem.mkdir({ path: `${ROOT}/${path}`, directory: DIR, recursive: true });
   } catch (_) {}
 }
 
 async function writeJson(relPath, obj) {
+  const { Filesystem, Encoding, DIR } = fsApi();
   await ensureDir(relPath.split("/").slice(0, -1).join("/") || "");
   await Filesystem.writeFile({
     path: `${ROOT}/${relPath}`,
@@ -33,6 +35,7 @@ async function writeJson(relPath, obj) {
 }
 
 async function readJson(relPath) {
+  const { Filesystem, Encoding, DIR } = fsApi();
   try {
     const { data } = await Filesystem.readFile({
       path: `${ROOT}/${relPath}`,
@@ -46,6 +49,7 @@ async function readJson(relPath) {
 }
 
 async function writeBin(relPath, base64) {
+  const { Filesystem, DIR } = fsApi();
   await ensureDir(relPath.split("/").slice(0, -1).join("/") || "");
   await Filesystem.writeFile({
     path: `${ROOT}/${relPath}`,
@@ -56,24 +60,27 @@ async function writeBin(relPath, base64) {
 }
 
 async function readBin(relPath) {
+  const { Filesystem, DIR } = fsApi();
   try {
     const { data } = await Filesystem.readFile({
       path: `${ROOT}/${relPath}`,
       directory: DIR,
     });
-    return data; // base64
+    return data;
   } catch {
     return null;
   }
 }
 
 async function remove(relPath) {
+  const { Filesystem, DIR } = fsApi();
   try {
     await Filesystem.deleteFile({ path: `${ROOT}/${relPath}`, directory: DIR });
   } catch (_) {}
 }
 
 async function listDir(relPath) {
+  const { Filesystem, DIR } = fsApi();
   try {
     const { files } = await Filesystem.readdir({
       path: `${ROOT}/${relPath}`,
@@ -85,9 +92,7 @@ async function listDir(relPath) {
   }
 }
 
-/* ---- Notes ---- */
 export async function putNoteFS(note) {
-  if (!isNative()) throw new Error("FS storage only on native");
   await writeJson(`notes/${note.id}.json`, note);
   return note;
 }
@@ -111,13 +116,10 @@ export async function deleteNoteFS(id) {
   await remove(`notes/${id}.json`);
 }
 
-/* ---- Assets (binary as base64) ---- */
 export async function putAssetFS(asset) {
   const { id, noteId, mimeType, ...meta } = asset;
   let base64 = asset.base64;
-  if (!base64 && asset.blob) {
-    base64 = await blobToBase64(asset.blob);
-  }
+  if (!base64 && asset.blob) base64 = await blobToBase64(asset.blob);
   if (!base64 && asset.bytes) {
     base64 = btoa(String.fromCharCode(...new Uint8Array(asset.bytes)));
   }
@@ -140,8 +142,7 @@ export async function getAssetsByNoteIdFS(noteId) {
     if (!f.name?.endsWith(".meta.json")) continue;
     const meta = await readJson(`assets/${f.name}`);
     if (meta?.noteId === noteId) {
-      const id = meta.id;
-      const base64 = await readBin(`assets/${id}.bin`);
+      const base64 = await readBin(`assets/${meta.id}.bin`);
       out.push({ ...meta, base64 });
     }
   }
@@ -158,25 +159,21 @@ export async function deleteAssetsByNoteIdFS(noteId) {
   for (const a of assets) await deleteAssetFS(a.id);
 }
 
-/* ---- Settings ---- */
-export async function getSettingsFS() {
-  return (await readJson("settings.json")) || {};
-}
-
-export async function putSettingsFS(obj) {
-  await writeJson("settings.json", obj);
-  return obj;
+export async function isFsAvailable() {
+  if (!isNative()) return false;
+  try {
+    const { Filesystem, Directory } = getFilesystem();
+    return !!(Filesystem && Directory);
+  } catch {
+    return false;
+  }
 }
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
-    r.onloadend = () => resolve((r.result || "").split(",")[1] || "");
+    r.onloadend = () => resolve(String(r.result || "").split(",")[1] || "");
     r.onerror = reject;
     r.readAsDataURL(blob);
   });
-}
-
-export async function isFsAvailable() {
-  return isNative() && !!Filesystem;
 }

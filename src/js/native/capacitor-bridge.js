@@ -1,81 +1,84 @@
 /**
  * capacitor-bridge.js
- * Deteksi platform native (Capacitor) & inisialisasi plugin StatusBar,
- * SplashScreen, App (back button), serta helper Filesystem untuk download
- * ke folder Download Android + storage data dir.
- *
- * Import sekali di spa-app.js / app.js setelah DOM ready.
+ * Deteksi platform native (Capacitor) & inisialisasi plugin.
+ * AMAN di web: tidak ada static import @capacitor/* — semua dynamic.
+ * Modul ini TIDAK boleh di-static-import dari jalur kritis data (db/notes).
  */
 
-let Capacitor = null;
-let StatusBar = null;
-let SplashScreen = null;
-let App = null;
-let Filesystem = null;
-let Directory = null;
-let Encoding = null;
+let _Capacitor = null;
+let _StatusBar = null;
+let _SplashScreen = null;
+let _App = null;
+let _Filesystem = null;
+let _Directory = null;
+let _Encoding = null;
+let _ready = false;
 
 export function isNative() {
-  return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-}
-
-export async function initNative() {
-  if (!isNative()) return false;
-
   try {
-    // Dynamic import supaya web build tidak error jika plugin belum ada
-    const core = await import("@capacitor/core");
-    Capacitor = core.Capacitor;
-
-    const sb = await import("@capacitor/status-bar");
-    StatusBar = sb.StatusBar;
-
-    const sp = await import("@capacitor/splash-screen");
-    SplashScreen = sp.SplashScreen;
-
-    const appMod = await import("@capacitor/app");
-    App = appMod.App;
-
-    const fs = await import("@capacitor/filesystem");
-    Filesystem = fs.Filesystem;
-    Directory = fs.Directory;
-    Encoding = fs.Encoding;
-
-    // Sembunyikan splash secepat mungkin
-    try {
-      await SplashScreen.hide();
-    } catch (_) {}
-
-    // StatusBar overlay + warna awal dari tema
-    try {
-      await StatusBar.setOverlaysWebView({ overlay: true });
-    } catch (_) {}
-
-    // Back button HP → history.back() (atau custom trap)
-    App.addListener("backButton", ({ canGoBack }) => {
-      // Biarkan router/trap-back-navigation menangani lewat popstate
-      // dengan memanggil history.back() — View Transitions tetap jalan
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        // Sudah di root — biarkan trap-home menyerap, atau exit
-        App.exitApp();
-      }
-    });
-
-    // Apply theme color segera
-    const theme = document.documentElement.getAttribute("data-theme") || "dark";
-    await applyNativeThemeColor(theme);
-
-    console.log("[Meimo Native] Capacitor bridge ready");
-    return true;
-  } catch (err) {
-    console.warn("[Meimo Native] Gagal init bridge:", err);
+    return !!(
+      typeof window !== "undefined" &&
+      window.Capacitor &&
+      typeof window.Capacitor.isNativePlatform === "function" &&
+      window.Capacitor.isNativePlatform()
+    );
+  } catch {
     return false;
   }
 }
 
-/** Warna background per tema (sama dengan THEMES.swatch di theme-manager) */
+export async function initNative() {
+  if (!isNative()) return false;
+  if (_ready) return true;
+
+  try {
+    const core = await import("@capacitor/core");
+    _Capacitor = core.Capacitor;
+
+    const sb = await import("@capacitor/status-bar");
+    _StatusBar = sb.StatusBar;
+
+    const sp = await import("@capacitor/splash-screen");
+    _SplashScreen = sp.SplashScreen;
+
+    const appMod = await import("@capacitor/app");
+    _App = appMod.App;
+
+    const fs = await import("@capacitor/filesystem");
+    _Filesystem = fs.Filesystem;
+    _Directory = fs.Directory;
+    _Encoding = fs.Encoding;
+
+    try {
+      await _SplashScreen.hide();
+    } catch (_) {}
+
+    try {
+      await _StatusBar.setOverlaysWebView({ overlay: true });
+    } catch (_) {}
+
+    _App.addListener("backButton", () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        try {
+          _App.exitApp();
+        } catch (_) {}
+      }
+    });
+
+    const theme = document.documentElement.getAttribute("data-theme") || "dark";
+    await applyNativeThemeColor(theme);
+
+    _ready = true;
+    console.log("[Meimo Native] bridge ready");
+    return true;
+  } catch (err) {
+    console.warn("[Meimo Native] init skipped:", err?.message || err);
+    return false;
+  }
+}
+
 const THEME_BG = {
   light: "#FFFFFF",
   dark: "#17181C",
@@ -84,7 +87,6 @@ const THEME_BG = {
   oled: "#000000",
 };
 
-/** Warna ikon status bar: light = gelap, dark = putih */
 const THEME_STYLE = {
   light: "DARK",
   dark: "LIGHT",
@@ -94,37 +96,34 @@ const THEME_STYLE = {
 };
 
 export async function applyNativeThemeColor(themeId) {
-  if (!isNative() || !StatusBar) return;
+  if (!isNative() || !_StatusBar) return;
   const bg = THEME_BG[themeId] || "#1E1E1E";
   const style = THEME_STYLE[themeId] || "LIGHT";
   try {
-    await StatusBar.setBackgroundColor({ color: bg });
-    await StatusBar.setStyle({ style });
-    // Juga update navigation bar (Android 8+)
-    if (Capacitor.getPlatform() === "android") {
-      // StatusBar plugin v6 mendukung navigationBarColor di beberapa versi
-      try {
-        await StatusBar.setBackgroundColor({ color: bg }); // re-apply
-      } catch (_) {}
-    }
+    await _StatusBar.setBackgroundColor({ color: bg });
+    await _StatusBar.setStyle({ style });
   } catch (e) {
-    console.warn("StatusBar set failed", e);
+    console.warn("[Meimo Native] StatusBar failed", e);
   }
 }
 
 /**
- * Simpan blob/file ke folder Download publik Android.
- * Fallback ke createObjectURL + <a download> kalau bukan native.
+ * Simpan blob ke folder Download Android.
+ * Web: fallback <a download>.
  */
 export async function saveToDownloads(blobOrBase64, fileName, mimeType = "application/octet-stream") {
-  if (!isNative() || !Filesystem) {
-    // Web fallback
-    const blob = blobOrBase64 instanceof Blob ? blobOrBase64 : base64ToBlob(blobOrBase64, mimeType);
+  if (!isNative() || !_Filesystem || !_Directory) {
+    const blob =
+      blobOrBase64 instanceof Blob
+        ? blobOrBase64
+        : base64ToBlob(blobOrBase64, mimeType);
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = fileName;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     return { path: fileName, web: true };
   }
@@ -133,31 +132,28 @@ export async function saveToDownloads(blobOrBase64, fileName, mimeType = "applic
   if (blobOrBase64 instanceof Blob) {
     base64 = await blobToBase64(blobOrBase64);
   } else {
-    base64 = blobOrBase64.replace(/^data:[^;]+;base64,/, "");
+    base64 = String(blobOrBase64).replace(/^data:[^;]+;base64,/, "");
   }
 
-  // Tulis ke Directory.ExternalStorage/Download (Android)
-  // atau Directory.Documents sebagai fallback
   try {
-    const result = await Filesystem.writeFile({
+    const result = await _Filesystem.writeFile({
       path: `Download/${fileName}`,
       data: base64,
-      directory: Directory.ExternalStorage,
+      directory: _Directory.ExternalStorage,
       recursive: true,
     });
     return { path: result.uri || `Download/${fileName}`, native: true };
   } catch (e1) {
-    // Fallback Directory.Documents
     try {
-      const result = await Filesystem.writeFile({
+      const result = await _Filesystem.writeFile({
         path: fileName,
         data: base64,
-        directory: Directory.Documents,
+        directory: _Directory.Documents,
         recursive: true,
       });
       return { path: result.uri || fileName, native: true, fallback: "Documents" };
     } catch (e2) {
-      console.error("Filesystem write failed", e1, e2);
+      console.error("[Meimo Native] write failed", e1, e2);
       throw e2;
     }
   }
@@ -167,8 +163,8 @@ function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      const dataUrl = reader.result;
-      resolve(dataUrl.split(",")[1] || "");
+      const dataUrl = reader.result || "";
+      resolve(String(dataUrl).split(",")[1] || "");
     };
     reader.onerror = reject;
     reader.readAsDataURL(blob);
@@ -176,10 +172,14 @@ function blobToBase64(blob) {
 }
 
 function base64ToBlob(base64, mime) {
-  const bin = atob(base64.replace(/^data:[^;]+;base64,/, ""));
+  const clean = String(base64).replace(/^data:[^;]+;base64,/, "");
+  const bin = atob(clean);
   const arr = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
   return new Blob([arr], { type: mime });
 }
 
-export { Filesystem, Directory, Encoding, App, StatusBar, SplashScreen };
+/** Getter lazy — null sampai initNative sukses */
+export function getFilesystem() {
+  return { Filesystem: _Filesystem, Directory: _Directory, Encoding: _Encoding };
+}
