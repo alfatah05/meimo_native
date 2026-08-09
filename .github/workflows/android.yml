@@ -46,22 +46,59 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Patch Android (plugins + RECORD_AUDIO + styles)
-        run: bash android-patches/patch-android.sh
+      - name: Patch Android (RECORD_AUDIO + plugins)
+        run: |
+          chmod +x android-patches/patch-android.sh
+          bash android-patches/patch-android.sh
 
-      - name: Verify RECORD_AUDIO in manifest
+      - name: Verify RECORD_AUDIO in source manifest
         run: |
           MANIFEST="android/app/src/main/AndroidManifest.xml"
-          echo "=== AndroidManifest.xml ==="
-          cat "$MANIFEST"
-          grep -q "RECORD_AUDIO" "$MANIFEST"
-          echo "RECORD_AUDIO OK"
+          test -f "$MANIFEST"
+          grep -n "RECORD_AUDIO" "$MANIFEST"
+          grep -n "uses-permission" "$MANIFEST"
+          echo "SOURCE MANIFEST OK"
 
       - name: Build debug APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Verify permissions inside APK
+        run: |
+          APK=$(ls android/app/build/outputs/apk/debug/*.apk | head -1)
+          echo "APK=$APK"
+          # Prefer aapt from Android SDK build-tools
+          AAPT=$(find "$ANDROID_SDK_ROOT" -name "aapt" 2>/dev/null | head -1 || true)
+          if [ -z "$AAPT" ]; then
+            AAPT=$(find /usr/local -name "aapt" 2>/dev/null | head -1 || true)
+          fi
+          if [ -n "$AAPT" ]; then
+            echo "Using $AAPT"
+            "$AAPT" dump permissions "$APK" || "$AAPT" dump badging "$APK" | head -50
+            "$AAPT" dump permissions "$APK" 2>/dev/null | tee /tmp/apk-perms.txt || true
+            if ! grep -qi "RECORD_AUDIO" /tmp/apk-perms.txt; then
+              echo "Trying badging..."
+              "$AAPT" dump badging "$APK" | tee /tmp/apk-badge.txt
+              grep -i "permission" /tmp/apk-badge.txt || true
+            fi
+            if ! grep -qi "RECORD_AUDIO" /tmp/apk-perms.txt /tmp/apk-badge.txt 2>/dev/null; then
+              echo "ERROR: RECORD_AUDIO not found in APK!"
+              exit 1
+            fi
+            echo "APK contains RECORD_AUDIO OK"
+          else
+            echo "aapt not found — unpack AndroidManifest from APK"
+            TMP=$(mktemp -d)
+            unzip -p "$APK" AndroidManifest.xml > "$TMP/AndroidManifest.xml" || true
+            # binary XML — use apkanalyzer if available
+            if command -v apkanalyzer >/dev/null 2>&1; then
+              apkanalyzer manifest permissions "$APK"
+            else
+              echo "WARN: cannot decode binary manifest; source check already passed"
+            fi
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

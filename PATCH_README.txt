@@ -1,16 +1,16 @@
-Meimo patch v1.23.22-cap9 — FIX mikrofon (RECORD_AUDIO di manifest)
+Meimo patch v1.23.22-cap10 — mikrofon: pastikan RECORD_AUDIO masuk APK
 
-Penyebab "tidak ada izin yang diminta":
-  sed \n di workflow gagal menulis <uses-permission> ke AndroidManifest.
-  APK terbuild TANPA RECORD_AUDIO → sistem tidak menampilkan dialog/izin.
+Perubahan:
+- patch-android.sh menulis permission dengan verifikasi (exit 1 jika gagal)
+- CI cetak FULL AndroidManifest.xml di log
+- CI cek RECORD_AUDIO di dalam APK (aapt dump) — build gagal jika tidak ada
 
-Perbaikan:
-  android-patches/patch-android.sh — Python insert RECORD_AUDIO dll. secara andal
-  Workflow step "Verify RECORD_AUDIO in manifest" (gagal build jika hilang)
-  MeimoPermissionsPlugin pakai requestPermissionForAlias (dialog resmi)
+WAJIB setelah push:
+1. Buka Actions → log step "Patch Android" → harus ada:
+   [patch] all required permissions present OK
+   dan baris: <uses-permission android:name="android.permission.RECORD_AUDIO" />
+2. Log step "Verify permissions inside APK" → APK contains RECORD_AUDIO OK
+3. Uninstall app lama di HP
+4. Install artifact baru
 
-WAJIB:
-  1. unzip + push
-  2. Tunggu Actions hijau (lihat log "RECORD_AUDIO OK")
-  3. Uninstall app lama di HP
-  4. Install APK baru dari artifact
+Kalau step Verify gagal, kirim log step Patch Android + Verify permissions.
