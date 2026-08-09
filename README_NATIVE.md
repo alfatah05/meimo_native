@@ -1,46 +1,39 @@
 # Meimo Native (Capacitor Android)
 
-Project ini sudah siap di-copy ke GitHub repo. GitHub Actions akan otomatis build APK saat push ke `main`/`master`.
+Siap push ke GitHub. Actions otomatis build APK (Node 22 + Java 21).
 
-## Quick start (lokal)
+## Fix error `webDir "." is not valid`
+
+Sudah diperbaiki: `webDir` = `www`. Script `scripts/prepare-www.sh` menyalin file web ke folder `www/` sebelum `cap sync`.
+
+## Quick start lokal
 
 ```bash
-git clone <repo-mu>
-cd meimo
 npm install --legacy-peer-deps
-npx cap add android          # hanya pertama kali
+npm run prepare:www          # buat folder www/
+npx cap add android          # sekali saja
 npx cap sync android
-npx cap open android         # buka di Android Studio, Run
+npx cap open android
 ```
 
-Atau biarkan **GitHub Actions** yang build:
-1. Push project ini ke repo (branch `main` atau `master`)
-2. Buka tab **Actions** → workflow **Build Android APK**
-3. Download artifact `meimo-android-debug`
+Atau satu perintah:
+```bash
+npm run cap:sync
+```
 
-## Fitur native yang sudah aktif
+## GitHub Actions
 
-| Fitur | Status |
-|-------|--------|
-| Hardware back button HP | ✅ `history.back()` + View Transitions tetap sama |
-| StatusBar + NavBar warna = tema | ✅ Sinkron real-time + cold start |
-| Splash screen `#1E1E1E` | ✅ |
-| Safe-area padding (tidak tertutup bar) | ✅ `viewport-fit=cover` + env(safe-area) |
-| Download note (.meimo) & backup .zip ke folder Download Android | ✅ Filesystem ExternalStorage |
-| Storage IndexedDB → Filesystem (Directory.Data) | ✅ Dual backend (native pakai FS, web tetap IDB) |
-| Animasi transisi halaman | ✅ Tidak diubah (menu, header back, back HP) |
-| Icon status bar kontras | ✅ LIGHT/DARK otomatis per tema |
+Push ke `main`/`master` → workflow **Build Android APK**:
+1. Node 22 + Java 21
+2. `npm install` → `prepare:www` → `cap add` → `cap sync`
+3. `./gradlew assembleDebug`
+4. Artifact: **meimo-android-debug**
 
-## Struktur penting
+## Fitur native
 
-- `capacitor.config.json` — konfigurasi app + splash
-- `src/js/native/capacitor-bridge.js` — StatusBar, App back, saveToDownloads
-- `src/js/db/fs-storage.js` + `notes-repository.js` — storage native
-- `.github/workflows/android.yml` — CI build APK
-- `.gitignore` — node_modules, android/, dll
-
-## Catatan
-
-- Folder `android/` **tidak** ikut di-commit (dihasilkan oleh `cap add` / CI).
-- Permission storage otomatis di-patch oleh workflow.
-- Kalau asset gambar tidak muncul di native setelah pakai FS, cek konversi base64→Blob di image pipeline.
+- Hardware back → history.back() + animasi View Transitions sama
+- StatusBar/NavBar warna = tema (cold start + ganti tema)
+- Splash `#1E1E1E`
+- Safe-area padding
+- Download .meimo / .zip ke folder Download Android
+- Storage dual: Filesystem (native) / IndexedDB (web)

@@ -4,11 +4,12 @@
   "description": "Meimo — Catatan Pribadi native (Capacitor)",
   "main": "index.html",
   "scripts": {
-    "build": "echo 'Static SPA — no build step needed'",
-    "cap:add": "npx cap add android",
-    "cap:sync": "npx cap sync android",
+    "prepare:www": "bash scripts/prepare-www.sh",
+    "build": "npm run prepare:www",
+    "cap:add": "npm run prepare:www && npx cap add android",
+    "cap:sync": "npm run prepare:www && npx cap sync android",
     "cap:open": "npx cap open android",
-    "cap:run": "npx cap run android",
+    "cap:run": "npm run prepare:www && npx cap run android",
     "android:debug": "cd android && ./gradlew assembleDebug",
     "android:release": "cd android && ./gradlew assembleRelease"
   },
