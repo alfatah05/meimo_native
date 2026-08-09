@@ -1,16 +1,14 @@
-Meimo patch v1.24.0-release-fix1
+Meimo patch v1.24.0-release-fix3
 
-Fix build release APK/AAB gagal:
-- signing: path keystore absolut + inject signingConfigs lebih aman
-- minifyEnabled false (hindari R8 tanpa proguard rules)
-- icon: hapus adaptive anydpi yang sering bikin AAPT error, pakai mipmap biasa
-- CI: cetak ringkasan error Gradle yang relevan
+- Signing tidak lagi inject ke tengah build.gradle (sering rusak brace)
+  → apply file terpisah keystore/signing-config.gradle
+- Error log CI filter "Resource missing" (bukan error asli)
+- YAML workflow valid
 
 Apply:
-  unzip -o meimo-patch-v1.24.0-release-fix1.zip
+  unzip -o meimo-patch-v1.24.0-release-fix3.zip
   git add .
-  git commit -m "fix: release build signing + icons (1.24.0-fix1)"
+  git commit -m "fix: safer release signing via signing-config.gradle"
   git push
 
-Kalau masih gagal, buka log step "Build Release APK + AAB"
-bagian "GRADLE FAILURE SUMMARY" dan kirim isinya.
+Kalau gagal lagi, kirim bagian "WHAT WENT WRONG" dari log.

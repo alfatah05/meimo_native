@@ -54,7 +54,6 @@ jobs:
       - name: Verify package + icons + mic
         run: |
           grep -n "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml
-          grep -n "applicationId\|namespace\|versionCode\|versionName" android/app/build.gradle 2>/dev/null || true
           test -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
           test -f android/app/src/main/java/com/meimo/app/MainActivity.java
           echo "VERIFY OK"
@@ -68,24 +67,26 @@ jobs:
         run: |
           chmod +x android-patches/setup-signing.sh
           bash android-patches/setup-signing.sh
-          echo "---- app/build.gradle (signing section) ----"
-          grep -n -A30 "signingConfigs" android/app/build.gradle || true
-          echo "---- keystore files ----"
-          ls -la android/keystore/
+          echo "---- app/build.gradle tail ----"
+          tail -30 android/app/build.gradle
+          echo "---- signing.properties ----"
+          cat android/keystore/signing.properties
 
       - name: Build Release APK + AAB
         working-directory: android
         run: |
           chmod +x gradlew
           set +e
-          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace --info 2>&1 | tee /tmp/gradle-release.log
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace 2>&1 | tee /tmp/gradle-release.log
           STATUS=${PIPESTATUS[0]}
           set -e
           if [ "$STATUS" -ne 0 ]; then
-            echo "======== GRADLE FAILURE SUMMARY ========"
-            grep -n -i -E "FAILURE|error:|What went wrong|Execution failed|AAPT|resource|signing|not found|Exception" /tmp/gradle-release.log | tail -80
-            echo "======== TAIL LOG ========"
-            tail -100 /tmp/gradle-release.log
+            echo "======== WHAT WENT WRONG ========"
+            awk '/What went wrong:/{flag=1} flag{print} /Try:/{if(flag){exit}}' /tmp/gradle-release.log || true
+            echo "======== OTHER ERRORS ========"
+            grep -n "Execution failed\|Could not\|AAPT\|Signing\|keystore\|Exception:" /tmp/gradle-release.log | grep -v "Resource missing" | tail -60 || true
+            echo "======== TAIL ========"
+            tail -80 /tmp/gradle-release.log
             exit "$STATUS"
           fi
 
