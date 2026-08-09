@@ -3,17 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <style>
-/* BUGFIX v1.19.1: aturan opt-in @view-transition ini SENGAJA inline di
-   sini (bukan di file eksternal src/css/view-transitions.css), dan
-   SENGAJA ditaruh sepaling-atas mungkin di <head>. Sebelumnya aturan ini
-   ada di dalam view-transitions.css yang posisi <link>-nya jauh di bawah
-   ~10 stylesheet lain — kalau file itu belum selesai di-fetch/parse pas
-   user buru-buru pindah halaman (terutama kunjungan pertama / cache
-   masih dingin), browser belum sempat "kenal" opt-in ini, jadi animasi
-   transisi halaman kadang dilewat begitu saja. Inline <style> dijamin
-   langsung tersedia tanpa nunggu network sama sekali, jadi animasinya
-   konsisten selalu jalan. Keyframes & style pseudo-element lain tetap di
-   view-transitions.css seperti biasa. */
+/* Opt-in View Transition — harus inline paling atas.
+   Animasi page-in/out dari src/css/view-transitions.css (sama seperti page lain). */
 @view-transition {
   navigation: auto;
 }
@@ -40,8 +31,7 @@
       if (meta) meta.setAttribute("content", THEME_COLORS[t] || THEME_COLORS.light);
     } catch (e) {}
   })();
-  // Capture pagereveal SEBELUM module boot — event bisa terpicu sangat awal
-  // di cross-document View Transition, sebelum card-style.js sempat listen.
+  // Capture pagereveal untuk boot() menunggu animasi selesai sebelum DOM berat.
   window.addEventListener("pagereveal", function (e) {
     window.__MEIMO_PAGE_REVEAL__ = e;
   });
@@ -210,13 +200,16 @@
       </div>
     </section>
 
-  </main>
+    <!-- Actions di alur konten (bukan fixed bar) — scroll ke bawah untuk submit.
+         Menghindari position:fixed yang bikin View Transition patah-patah. -->
+    <section class="section card-style-actions">
+      <div class="card-style-actions__row">
+        <button type="button" id="resetBtn" class="modal-btn modal-btn--ghost" data-i18n="cardStyle.reset">Reset</button>
+        <button type="button" id="saveBtn" class="modal-btn modal-btn--primary" data-i18n="cardStyle.save">Save</button>
+      </div>
+    </section>
 
-  <!-- ============ ACTION BAR ============ -->
-  <div class="card-style-actionbar">
-    <button type="button" id="resetBtn" class="modal-btn modal-btn--ghost" data-i18n="cardStyle.reset">Reset</button>
-    <button type="button" id="saveBtn" class="modal-btn modal-btn--primary" data-i18n="cardStyle.save">Save</button>
-  </div>
+  </main>
 
 </div>
 

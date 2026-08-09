@@ -6,10 +6,8 @@
    nempel di bawah layar.
    ========================================================================== */
 
-/* Ruang ekstra di bawah supaya action bar sticky tidak menutupi konten
-   terakhir (lihat .card-style-actionbar di bawah). */
 .card-style-page {
-  padding-bottom: calc(var(--space-4xl) + 64px);
+  padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom, 0px));
 }
 
 /* ---- Pratinjau ---- */
@@ -343,21 +341,17 @@
 
 /* ---- Action bar (Setel Ulang / Simpan) ---- */
 
-.card-style-actionbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-sticky);
-  display: flex;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  padding-bottom: calc(var(--space-md) + env(safe-area-inset-bottom, 0px));
-  background-color: var(--color-bg);
+/* Tombol Reset/Simpan di alur konten (bukan fixed bottom bar). */
+.card-style-actions {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
   border-top: 1px solid var(--color-border);
 }
-
-.card-style-actionbar .modal-btn {
+.card-style-actions__row {
+  display: flex;
+  gap: var(--space-sm);
+}
+.card-style-actions__row .modal-btn {
   flex: 1;
 }
 
