@@ -301,10 +301,26 @@ async function boot() {
     }
     try {
       await withTimeout(
-        Promise.all([
-          ensureInstalledFontsLoaded(),
-          refreshData().then(() => preloadCardBackgrounds(allNotes)),
-        ]),
+        (async () => {
+          // List notes dulu (ringan), lalu FontFace hanya untuk titleFont
+          // yang benar-benar dipakai di kartu Home — sisanya idle.
+          await refreshData();
+          const titleFonts = [
+            ...new Set(
+              (allNotes || [])
+                .map((n) => n?.metadata?.cardStyle?.titleFont)
+                .filter(Boolean)
+            ),
+          ];
+          await Promise.all([
+            ensureInstalledFontsLoaded({
+              families: titleFonts,
+              deferRest: true,
+              concurrency: 2,
+            }),
+            preloadCardBackgrounds(allNotes),
+          ]);
+        })(),
         12000,
         "fonts+listNotes"
       );

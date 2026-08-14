@@ -20,7 +20,7 @@
  */
 
 import * as documentService from "../services/document-service.js";
-import { ensureInstalledFontsLoaded, getAvailableFonts } from "../services/font-service.js";
+import { ensureInstalledFontsLoaded, extractFontFamiliesFromHtml, getAvailableFonts } from "../services/font-service.js";
 import { createDefaultCardStyle } from "../db/schema.js";
 import { createEl, clearChildren, openPanel, closeTransientPickers } from "../utils/dom.js";
 import { createNoteCard } from "./note-card.js";
@@ -65,13 +65,12 @@ async function boot() {
 
   const noteId = getNoteIdFromUrl();
 
-  // Mulai load data SEGERA (paralel dengan animasi page-in), tapi jangan
-  // mutasi DOM dulu. FontFace API + render swatch clip-path kompleks
-  // sebelumnya jalan di tengah animasi → naik-nya terasa lambat/berat.
-  const dataPromise = Promise.all([
-    noteId ? documentService.loadNote(noteId) : Promise.resolve(null),
-    ensureInstalledFontsLoaded(),
-  ]);
+  // 1) Load note SEGERA (ringan).
+  // 2) JANGAN load semua font di sini — itu biang lambat saat banyak font.
+  // 3) Tunggu page transition SELESAI sebelum mutasi DOM berat.
+  const notePromise = noteId
+    ? documentService.loadNote(noteId)
+    : Promise.resolve(null);
 
   // Tunggu animasi page transition selesai (SPA: router.waitForPageTransition;
   // multi-page / tanpa VT: langsung lanjut). Fallback timeout supaya tidak
@@ -95,7 +94,7 @@ async function boot() {
     /* ignore — jangan gagalkan boot karena helper transisi */
   }
 
-  const [note] = await dataPromise;
+  const note = await notePromise;
   if (!note) {
     if (window.__MEIMO_SPA__) {
       import("../router.js").then((r) => {
@@ -108,7 +107,22 @@ async function boot() {
     return;
   }
 
+  // Meta list saja (tanpa bytes) — cepat, cukup untuk dropdown.
   const fonts = await getAvailableFonts();
+
+  // Prioritas FontFace: title font draft + family yang dipakai di note.
+  // Sisanya di background idle — jangan blok first paint.
+  const draftTitleFont =
+    (note.metadata && note.metadata.cardStyle && note.metadata.cardStyle.titleFont) || null;
+  const used = extractFontFamiliesFromHtml(
+    `${note.title || ""} ${note.body || note.content || note.html || ""}`
+  );
+  const priorityFamilies = [...new Set([draftTitleFont, ...used].filter(Boolean))];
+  const priorityFontPromise = ensureInstalledFontsLoaded({
+    families: priorityFamilies,
+    deferRest: true,
+    concurrency: 1,
+  });
 
   const originalCardStyle = note.metadata.cardStyle
     ? { ...createDefaultCardStyle(), ...note.metadata.cardStyle }
@@ -611,7 +625,6 @@ async function boot() {
   });
 
   renderFontSelect();
-  renderEdgeShapeList();
   // Init mode dari draft tersimpan
   const initialMode = detectBgMode();
   if (draft.bgColor) {
@@ -628,13 +641,30 @@ async function boot() {
   }
   setBgMode(initialMode, { applyDefaults: false });
   renderBgColorList();
-  renderPreview();
 
-  // Skeleton cuma perlu tampil sekali di load pertama (biar tidak "kedip
-  // putih" pas navigasi ke halaman ini) — begitu semua section sudah
-  // dirender dengan data asli, sembunyikan permanen (lihat pola yang sama
-  // di fonts/font-manager.js).
+  // Preview dulu (1 kartu) — ringan. Edge shapes (banyak clip-path) ditunda
+  // idle supaya tidak tabrakan dengan sisa compositing page-in.
+  renderPreview();
   if (skeleton) skeleton.hidden = true;
+
+  const scheduleEdge = (fn) => {
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(() => fn(), { timeout: 200 });
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(fn));
+    }
+  };
+  scheduleEdge(() => {
+    renderEdgeShapeList();
+  });
+
+  // Priority font lalu re-render preview bila family sudah siap.
+  Promise.race([
+    priorityFontPromise,
+    new Promise((r) => setTimeout(r, 2000)),
+  ]).then(() => {
+    renderPreview();
+  }).catch(() => {});
 }
 
 /** Init untuk SPA / multi-page. */

@@ -18,6 +18,7 @@
  */
 
 import * as fontsRepository from "../db/fonts-repository.js";
+import { stripToMeta } from "../db/fonts-repository.js";
 import { createFontRecord } from "../db/schema.js";
 import { uuid } from "../utils/uuid.js";
 
@@ -58,7 +59,7 @@ export async function getFontLibrary() {
 
   libraryPromise = (async () => {
     try {
-      const res = await fetch(FONT_LIBRARY_MANIFEST_URL, { cache: "no-cache" });
+      const res = await fetch(FONT_LIBRARY_MANIFEST_URL, { cache: "force-cache" });
       if (!res.ok) throw new Error(`Gagal memuat manifest Font Library (status ${res.status}).`);
       const data = await res.json();
       return Array.isArray(data.fonts) ? data.fonts : [];
@@ -71,9 +72,87 @@ export async function getFontLibrary() {
   return libraryPromise;
 }
 
-/** Ambil seluruh font kustom yang sudah diunduh (record lengkap termasuk Blob). */
-export function getInstalledFonts() {
-  return fontsRepository.getAllFonts();
+/* ------------------------------------------------------------------ */
+/* Cache in-memory (meta + full) — hindari baca ulang storage tiap page */
+/* ------------------------------------------------------------------ */
+let installedFullCache = null;   // Array<record with bytes> | null
+let installedMetaCache = null;   // Array<meta> | null
+let installedFullPromise = null; // in-flight getAllFonts
+let installedMetaPromise = null;
+
+function invalidateInstalledCache() {
+  installedFullCache = null;
+  installedMetaCache = null;
+  installedFullPromise = null;
+  installedMetaPromise = null;
+}
+
+
+function upsertInstalledCache(record) {
+  if (!record || !record.id) return;
+  const meta = stripToMeta(record);
+  if (installedMetaCache) {
+    const i = installedMetaCache.findIndex((f) => f.id === record.id);
+    if (i >= 0) installedMetaCache[i] = meta;
+    else installedMetaCache.push(meta);
+  }
+  if (installedFullCache) {
+    const i = installedFullCache.findIndex((f) => f.id === record.id);
+    if (i >= 0) installedFullCache[i] = record;
+    else installedFullCache.push(record);
+  }
+  // Kalau cache belum pernah di-warm, biarkan null — next read dari storage
+  // akan dapat daftar lengkap termasuk record baru yang sudah di-put.
+}
+
+function removeFromInstalledCache(id) {
+  if (installedMetaCache) {
+    installedMetaCache = installedMetaCache.filter((f) => f.id !== id);
+  }
+  if (installedFullCache) {
+    installedFullCache = installedFullCache.filter((f) => f.id !== id);
+  }
+}
+
+
+/** Ambil seluruh font kustom yang sudah diunduh (record lengkap termasuk bytes). */
+export async function getInstalledFonts() {
+  if (installedFullCache) return installedFullCache;
+  if (installedFullPromise) return installedFullPromise;
+  installedFullPromise = (async () => {
+    try {
+      const all = await fontsRepository.getAllFonts();
+      installedFullCache = all || [];
+      installedMetaCache = installedFullCache.map(stripToMeta);
+      return installedFullCache;
+    } finally {
+      installedFullPromise = null;
+    }
+  })();
+  return installedFullPromise;
+}
+
+/**
+ * Metadata saja (tanpa ArrayBuffer) — murah. Dipakai daftar dropdown /
+ * Font Manager status, bukan FontFace.
+ */
+export async function getInstalledFontsMeta() {
+  if (installedMetaCache) return installedMetaCache;
+  if (installedFullCache) {
+    installedMetaCache = installedFullCache.map(stripToMeta);
+    return installedMetaCache;
+  }
+  if (installedMetaPromise) return installedMetaPromise;
+  installedMetaPromise = (async () => {
+    try {
+      const meta = await fontsRepository.getAllFontsMeta();
+      installedMetaCache = meta || [];
+      return installedMetaCache;
+    } finally {
+      installedMetaPromise = null;
+    }
+  })();
+  return installedMetaPromise;
 }
 
 /**
@@ -82,14 +161,29 @@ export function getInstalledFonts() {
  * terpisah dari section Font Library.
  */
 export async function getUploadedFonts() {
-  const installed = await getInstalledFonts();
-  return installed.filter((f) => f.source === "upload");
+  const meta = await getInstalledFontsMeta();
+  const uploaded = meta.filter((f) => f.source === "upload");
+  // FontFace untuk uploaded perlu bytes — load full on demand via getFontById
+  // tapi createUploadedItem butuh family name saja. Return meta is enough
+  // for list; ensure faces loaded separately if needed.
+  return uploaded;
 }
 
 /** True bila sebuah font Font Library (berdasarkan id) sudah diunduh. */
 export async function isFontInstalled(id) {
+  const meta = await getInstalledFontsMeta();
+  if (meta.some((f) => f.id === id)) return true;
   const rec = await fontsRepository.getFontById(id);
   return !!rec;
+}
+
+/** Full record by id, with in-memory cache reuse. */
+async function getFontRecordById(id) {
+  if (installedFullCache) {
+    const hit = installedFullCache.find((f) => f.id === id);
+    if (hit) return hit;
+  }
+  return fontsRepository.getFontById(id);
 }
 
 /**
@@ -101,7 +195,7 @@ export async function isFontInstalled(id) {
  * unggahan sendiri) dan `favorite` (lihat bagian Font Favorit di bawah).
  */
 export async function getAvailableFonts() {
-  const installed = await getInstalledFonts();
+  const installed = await getInstalledFontsMeta();
   const favoriteIds = readFavoriteFontIds();
   const installedSimplified = installed
     .slice()
@@ -185,41 +279,165 @@ function faceKey(family, weight, style) {
 
 async function loadFontRecordFaces(record) {
   if (!record || !Array.isArray(record.files)) return;
-  await Promise.all(
-    record.files.map(async (file) => {
-      const weight = file.weight || 400;
-      const style = file.style || "normal";
-      const key = faceKey(record.family, weight, style);
-      if (loadedFaceKeys.has(key)) return;
-      if (typeof FontFace === "undefined" || !file.bytes) return;
-      try {
-        // `bytes` sudah berupa ArrayBuffer (bukan Blob) — FontFace API
-        // menerima ArrayBuffer langsung, jadi tidak perlu konversi apa pun.
-        const face = new FontFace(record.family, file.bytes, { weight: String(weight), style });
-        await face.load();
-        document.fonts.add(face);
-        loadedFaceKeys.add(key);
-      } catch (err) {
-        console.error(`Gagal memuat font "${record.family}" (${weight}/${style}):`, err);
+  // Sequential per-file dalam 1 family — lebih ringan di main thread
+  // daripada Promise.all puluhan Face sekaligus.
+  for (const file of record.files) {
+    const weight = file.weight || 400;
+    const style = file.style || "normal";
+    const key = faceKey(record.family, weight, style);
+    if (loadedFaceKeys.has(key)) continue;
+    if (typeof FontFace === "undefined" || !file.bytes) continue;
+    try {
+      const face = new FontFace(record.family, file.bytes, {
+        weight: String(weight),
+        style,
+      });
+      await face.load();
+      document.fonts.add(face);
+      loadedFaceKeys.add(key);
+    } catch (err) {
+      console.error(`Gagal memuat font "${record.family}" (${weight}/${style}):`, err);
+    }
+  }
+}
+
+/** Pool concurrency terbatas — hindari spike CPU saat banyak font. */
+async function mapPool(items, fn, concurrency = 2) {
+  const list = Array.from(items || []);
+  if (list.length === 0) return;
+  let i = 0;
+  const workers = Array.from({ length: Math.min(concurrency, list.length) }, async () => {
+    while (i < list.length) {
+      const idx = i++;
+      await fn(list[idx]);
+    }
+  });
+  await Promise.all(workers);
+}
+
+function scheduleIdle(fn) {
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(() => { fn(); }, { timeout: 2000 });
+  } else {
+    setTimeout(fn, 50);
+  }
+}
+
+/**
+ * Resolve meta → full record (bytes) lalu FontFace.
+ * Pakai cache full bila ada; kalau belum, getFontById per id (jauh lebih
+ * murah daripada getAllFonts saat cuma butuh 1–2 family prioritas).
+ */
+async function loadFacesForMetaList(metaList, concurrency) {
+  await mapPool(
+    metaList,
+    async (meta) => {
+      if (!meta || !meta.id) return;
+      // Skip kalau semua face family ini sudah di document.fonts
+      const already = (meta.files || []).every((f) =>
+        loadedFaceKeys.has(faceKey(meta.family, f.weight || 400, f.style || "normal"))
+      );
+      if (already && (meta.files || []).length) return;
+      const rec = await getFontRecordById(meta.id);
+      if (rec) {
+        // Warm full cache incrementally
+        if (installedFullCache) {
+          const idx = installedFullCache.findIndex((x) => x.id === rec.id);
+          if (idx === -1) installedFullCache.push(rec);
+          else installedFullCache[idx] = rec;
+        }
+        await loadFontRecordFaces(rec);
       }
-    })
+    },
+    concurrency
   );
 }
 
 /**
- * Pastikan SEMUA font kustom yang sudah diunduh sebelumnya aktif sebagai
- * @font-face di sesi ini. Dipanggil saat editor/Font Manager dibuka supaya
- * teks yang sudah memakai font kustom langsung tampil benar (tanpa ini,
- * teks akan jatuh ke font fallback karena browser belum tahu font-nya).
+ * Muat @font-face font terpasang.
+ * options.families — prioritaskan family ini dulu (yang dipakai note).
+ * options.deferRest — sisanya di background (default true).
+ * options.concurrency — paralel max (default 2).
+ *
+ * PENTING: tidak lagi memanggil getAllFonts() (full bytes) di awal.
+ * Cukup meta list, lalu load bytes per-id untuk yang prioritas.
+ * Itu yang bikin card-style 15 detik → ~1 detik saat banyak font terpasang.
  */
-export async function ensureInstalledFontsLoaded() {
-  const installed = await getInstalledFonts();
-  await Promise.all(installed.map(loadFontRecordFaces));
+export async function ensureInstalledFontsLoaded(options = {}) {
+  const {
+    families = null,
+    deferRest = true,
+    concurrency = 2,
+  } = options;
+
+  const meta = await getInstalledFontsMeta();
+  if (!meta.length) return;
+
+  const priorityNames = new Set(
+    (families || []).map((f) => String(f || "").toLowerCase()).filter(Boolean)
+  );
+
+  const first = [];
+  const rest = [];
+  for (const rec of meta) {
+    const fam = String(rec.family || "").toLowerCase();
+    const id = String(rec.id || "").toLowerCase();
+    if (priorityNames.size && (priorityNames.has(fam) || priorityNames.has(id))) {
+      first.push(rec);
+    } else if (priorityNames.size) {
+      rest.push(rec);
+    } else {
+      first.push(rec);
+    }
+  }
+
+  // Tanpa priority: load 1–2 dulu supaya first paint cepat, sisanya idle.
+  if (!priorityNames.size && deferRest && first.length > 2) {
+    const head = first.slice(0, 2);
+    const tail = first.slice(2);
+    await loadFacesForMetaList(head, concurrency);
+    scheduleIdle(() => {
+      loadFacesForMetaList(tail, concurrency).catch(() => {});
+    });
+    return;
+  }
+
+  await loadFacesForMetaList(first, concurrency);
+
+  if (rest.length) {
+    if (deferRest) {
+      scheduleIdle(() => {
+        loadFacesForMetaList(rest, Math.min(concurrency, 1)).catch(() => {});
+      });
+    } else {
+      await loadFacesForMetaList(rest, concurrency);
+    }
+  }
+}
+
+/** Extract font-family names referenced in HTML/CSS-ish note content. */
+export function extractFontFamiliesFromHtml(html) {
+  if (!html) return [];
+  const found = new Set();
+  const re = /font-family\s*:\s*([^;"']+)/gi;
+  let m;
+  while ((m = re.exec(String(html)))) {
+    const raw = m[1]
+      .split(",")[0]
+      .replace(/["']/g, "")
+      .trim();
+    if (raw) found.add(raw);
+  }
+  return Array.from(found);
 }
 
 // Lacak kombinasi family+weight+style yang sudah dimuat KHUSUS untuk
 // pratinjau (belum diunduh/disimpan) di sesi berjalan ini.
 const previewedFaceKeys = new Set();
+
+// Promise in-flight per key — concurrent call untuk font yang sama
+// (scroll cepat / re-render) tidak fetch berkali-kali.
+const previewInflight = new Map();
 
 /**
  * Muat SATU font Font Library (belum tentu sudah diunduh) langsung dari
@@ -229,9 +447,14 @@ const previewedFaceKeys = new Set();
  * begitu halaman di-reload dan tidak menambah storage tersimpan.
  * Aman dipanggil berkali-kali untuk font yang sama (di-skip kalau sudah
  * pernah dimuat, baik lewat pratinjau ini maupun karena sudah terpasang).
+ *
+ * Caching:
+ *  - Session (memori): previewedFaceKeys / loadedFaceKeys + inflight map
+ *  - HTTP: fetch dengan cache:"force-cache" supaya browser/Service Worker
+ *    tidak unduh ulang file font yang sudah pernah diload.
  */
 export async function ensureLibraryFontPreviewLoaded(libraryFont) {
-  if (typeof FontFace === "undefined") return;
+  if (typeof FontFace === "undefined" || !libraryFont) return;
   const sourceFiles = Array.isArray(libraryFont.files) ? libraryFont.files : [];
   await Promise.all(
     sourceFiles.map(async (file) => {
@@ -239,20 +462,40 @@ export async function ensureLibraryFontPreviewLoaded(libraryFont) {
       const style = file.style || "normal";
       const key = faceKey(libraryFont.family, weight, style);
       if (loadedFaceKeys.has(key) || previewedFaceKeys.has(key)) return;
-      try {
-        const res = await fetch(file.url);
-        if (!res.ok) throw new Error(`Gagal memuat pratinjau: ${file.url}`);
-        const buffer = await res.arrayBuffer();
-        const face = new FontFace(libraryFont.family, buffer, { weight: String(weight), style });
-        await face.load();
-        document.fonts.add(face);
-        previewedFaceKeys.add(key);
-      } catch (err) {
-        console.error(`Gagal memuat pratinjau font "${libraryFont.family}":`, err);
+
+      // Reuse in-flight promise jika ada (hindari double-fetch).
+      if (previewInflight.has(key)) {
+        await previewInflight.get(key);
+        return;
       }
+
+      const job = (async () => {
+        try {
+          // force-cache: pakai HTTP cache / Service Worker cache dulu.
+          // File font library adalah asset statis (URL fixed) — aman di-cache agresif.
+          const res = await fetch(file.url, { cache: "force-cache" });
+          if (!res.ok) throw new Error(`Gagal memuat pratinjau: ${file.url}`);
+          const buffer = await res.arrayBuffer();
+          const face = new FontFace(libraryFont.family, buffer, {
+            weight: String(weight),
+            style,
+          });
+          await face.load();
+          document.fonts.add(face);
+          previewedFaceKeys.add(key);
+        } catch (err) {
+          console.error(`Gagal memuat pratinjau font "${libraryFont.family}":`, err);
+        } finally {
+          previewInflight.delete(key);
+        }
+      })();
+
+      previewInflight.set(key, job);
+      await job;
     })
   );
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Unduh / hapus font dari Font Library                                */
@@ -271,7 +514,7 @@ export async function installFont(libraryFont) {
 
   const files = [];
   for (const file of sourceFiles) {
-    const res = await fetch(file.url);
+    const res = await fetch(file.url, { cache: "force-cache" });
     if (!res.ok) throw new Error(`Gagal mengunduh berkas font: ${file.url}`);
     // Simpan sebagai ArrayBuffer (bytes), BUKAN Blob mentah — menyimpan
     // Blob langsung ke IndexedDB tidak reliable di sejumlah browser (lihat
@@ -299,12 +542,16 @@ export async function installFont(libraryFont) {
 
   await fontsRepository.putFont(record);
   await loadFontRecordFaces(record);
+  // Upsert ke cache — JANGAN invalidate+replace (bug: cache cuma berisi
+  // font terakhir yang di-install, font lain "hilang" dari dropdown/editor).
+  upsertInstalledCache(record);
   return record;
 }
 
 /** Hapus font kustom yang sudah diunduh dari penyimpanan lokal (IndexedDB). */
 export async function removeFont(id) {
   await fontsRepository.deleteFont(id);
+  removeFromInstalledCache(id);
   // Catatan: tidak ada API standar untuk "melepas" FontFace yang sudah
   // sempat ditambahkan ke `document.fonts` pada sesi yang sedang berjalan
   // ini — teks yang kebetulan masih memakai font ini di layar saat ini
@@ -343,7 +590,7 @@ function deriveNameFromFilename(filename) {
  * `document.fonts`).
  */
 async function ensureUniqueFamily(baseName) {
-  const [installed] = await Promise.all([getInstalledFonts()]);
+  const installed = await getInstalledFontsMeta();
   const taken = new Set([
     ...BUILTIN_FONTS.map((f) => f.family.toLowerCase()),
     ...installed.map((f) => f.family.toLowerCase()),
@@ -398,5 +645,6 @@ export async function installCustomFont(file) {
   await fontsRepository.putFont(record);
   document.fonts.add(face);
   loadedFaceKeys.add(faceKey(family, 400, "normal"));
+  upsertInstalledCache(record);
   return record;
 }
