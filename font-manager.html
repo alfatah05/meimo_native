@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" data-theme="light">
+<html lang="id" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -125,7 +125,7 @@
       <div class="section-header">
         <span class="section-title">Font Library</span>
       </div>
-      <p class="font-manager-hint">Unduh font tambahan untuk dipakai di editor. Sekali diunduh, font tetap tersimpan di perangkat ini walau offline.</p>
+      <p class="font-manager-hint" data-i18n="fonts.library.desc">Download extra fonts for the editor. Once downloaded, fonts stay on this device offline.</p>
       <div id="libraryFontList" class="font-manager-list" hidden></div>
       <div id="libraryFontPagination" class="font-manager-pagination" hidden></div>
     </section>
@@ -139,7 +139,7 @@
         <line x1="34" y1="68" x2="50" y2="68"></line>
       </svg>
       <div class="empty-state__title" data-i18n="fonts.library.empty">Font Library is empty</div>
-      <p class="empty-state__desc">Belum ada font tambahan yang bisa diunduh. Tambahkan lewat assets/fonts/library/manifest.json.</p>
+      <p class="empty-state__desc" data-i18n="fonts.library.empty.desc">No extra fonts available to download yet.</p>
     </div>
 
     <!-- ============ FONT KUSTOM (UNGGAH) ============
@@ -152,7 +152,7 @@
       <div class="section-header">
         <span class="section-title" data-i18n="fonts.custom">Custom fonts (upload)</span>
       </div>
-      <p class="font-manager-hint">Unggah berkas font sendiri (.ttf, .otf, .woff, .woff2) dari perangkat ini untuk dipakai di editor.</p>
+      <p class="font-manager-hint" data-i18n="fonts.custom.hint">Upload your own font files (.ttf, .otf, .woff, .woff2) from this device to use in the editor.</p>
 
       <button type="button" id="btnUploadFont" class="font-manager-upload-btn">
         <span class="font-manager-upload-btn__icon">

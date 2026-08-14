@@ -1,6 +1,6 @@
 # Personal Notes PWA
 
-**Versi: v1.23.22** (lihat [Changelog](#changelog) di bawah untuk riwayat versi)
+**Versi: v1.23.51** (lihat [Changelog](#changelog) di bawah untuk riwayat versi)
 
 Kerangka struktur folder untuk aplikasi PWA pencatatan pribadi (bukan markdown editor),
 dibuat mengikuti `PROJECT_RULES.md`.
@@ -210,6 +210,135 @@ lewat tombol seperti biasa di `cadangkan.html`.
 
 Aturan penomoran versi (SemVer) & checklist sebelum export/zip dipindah
 ke [`AI_RULES.md`](./AI_RULES.md).
+
+### v1.23.51
+- Ruler virtual (tick jarak tetap 5px, hanya render sekitar viewport) — offset ±9999, radius max 1000, scale 10–500%.
+- Offset/scale/rotate tetap pada isi gambar (object-position + transform di `<img>`), bukan frame.
+- `CACHE_VERSION` -> v146.
+
+### v1.23.50
+- Image offset via object-position (size=frame, offset=pan cover).
+- `CACHE_VERSION` -> v145.
+
+### v1.23.49
+- Toolbar i18n: font tabs, align, line-height, letter-spacing, hyperlink panel.
+- `CACHE_VERSION` -> v144.
+
+### v1.23.48
+- `.image-sheet__sub-rail` gap di-nol-kan (berlaku image + scene child sheets).
+- `CACHE_VERSION` -> v143.
+
+### v1.23.47
+- Image sheet: orbit dot rotate dial centered; no scroll on size child body; rail icon gap 0.
+- `CACHE_VERSION` -> v142.
+
+### v1.23.46
+- Image sheet Size: rail tab Offset (X/Y + Scale) & Rotate (radial 360°) — active ungu, inactive putih.
+- Model: `imageOffsetX/Y`, `imageScale`, `imageRotate` (preview + persist).
+- `CACHE_VERSION` -> v141.
+
+### v1.23.45
+- Image sheet Size: tab Offset (X/Y + Scale) & Rotate (radial 360°) di rail kiri; active ungu / inactive putih.
+- Model gambar: `imageOffsetX`, `imageOffsetY`, `imageScale`, `imageRotate` (preview + persist).
+- `CACHE_VERSION` -> v140.
+
+### v1.23.44
+- Scene sheet: UX padding visual, color card (bar + grid + opacity), custom RGBA, back icon selaras crop sheet; i18n image/scene/music sheets.
+- Default tema aplikasi: dark.
+- Card style: background digabung satu card dengan tab None / Color / Image (opacity color & image, upload/hapus chip).
+- `CACHE_VERSION` -> v139.
+
+### v1.23.43
+- Music sheet: compact (tinggi/padding sama); tombol pilih lagu full width (nama kiri transparan + icon 40px kanan); Batal/Terapkan/Delete sama pola image sheet.
+- `CACHE_VERSION` -> v138.
+
+### v1.23.42
+- Scene sheet: rombak compact seperti image sheet — padding 5 chip, big Color/Edge, Batal/Terapkan/Delete; child Color (grid 4 baris) & Edge (2 baris, chip 100×80).
+- `CACHE_VERSION` -> v137.
+
+### v1.23.41
+- Chip/menu: background disamakan dengan tampilan efektif toggle wrap text saat disabled.
+- `CACHE_VERSION` -> v136.
+
+### v1.23.40
+- Chip/menu: warna mengikuti tone icon topbar disabled (mix text-primary 14% + surface); label dimensi ikut tema (bukan putih statis).
+- `CACHE_VERSION` -> v135.
+
+### v1.23.39
+- Chip/menu lebih terang dari background sheet di semua tema (`surface` mix putih); sheet tetap surface.
+- `CACHE_VERSION` -> v134.
+
+### v1.23.38
+- Ruler: momentum lebih satisfying (friction eksponensial, amplifikasi 2.8×).
+- Background menu/chip pakai `--color-bg` (sheet tetap surface).
+- Crop: grid 4 baris, kolom mengalir ke kanan, scroll horizontal.
+- `CACHE_VERSION` -> v133.
+
+### v1.23.37
+- Ruler: momentum lebih panjang (decel lebih rendah + amplifikasi lempar).
+- Chip lebih terang (kontras di atas surface); crop: icon 40×40 tanpa label/bg/border, scroll horizontal; body padding 15px; rail kiri tetap tanpa padding.
+- `CACHE_VERSION` -> v132.
+
+### v1.23.36
+- Ruler: momentum/fling saat lepas jari; pointer tebal 1px (sama garis).
+- Sheet utama: tinggi 205px, padding 15×20, radius chip 5px, tanpa border; Terapkan = background accent-soft.
+- `CACHE_VERSION` -> v131.
+
+### v1.23.35
+- Image sheet ruler: pointer di luar track (tidak ikut geser), posisi via transform+drag (bukan scrollLeft); chip tinggi 40px, label putih, tanpa border.
+- `CACHE_VERSION` -> v130.
+
+### v1.23.34
+- Image sheet ruler: pointer di tengah via padding px + ResizeObserver; chip 50px radius 5; garis 40px; pointer 50px; gap 10px; body child bisa scroll, rail kiri tetap.
+- `CACHE_VERSION` -> v128.
+
+### v1.23.33
+- Image sheet ruler: pointer tengah via padding 50%, update dimensi gambar realtime saat digeser; chip label 80×60, nilai 70×60, garis 50px, pointer 60px.
+- `CACHE_VERSION` -> v127.
+
+### v1.23.32
+- Image sheet dimensi: ruler diperbaiki (pointer tengah, fade kiri-kanan, label/nilai ber-chip, tick seragam, align atas); rail child icon tanpa background, lebih lebar.
+- `CACHE_VERSION` -> v126.
+
+### v1.23.31
+- Image sheet tinggi 195px (bar/icon/Batal 40px); child rail kiri nempel tepi, back + icon 40px gap 5px radius 10px.
+- Dimensi: slider diganti ruler scroller (tick 1px, pointer tengah accent, snap magnet).
+- `CACHE_VERSION` -> v125.
+
+### v1.23.30
+- Image sheet: align aktif hanya ganti warna icon (tanpa background); delete icon merah dari awal, saat konfirmasi jadi checklist merah + border/bg merah.
+- `CACHE_VERSION` -> v124.
+
+### v1.23.29
+- Image sheet: border-radius semua box 10px; background menu disamakan dengan tampilan wrap disabled (blend bg@40% + surface).
+- `CACHE_VERSION` -> v123.
+
+### v1.23.28
+- Image sheet child (Dimensi/Crop): menu bar di kiri lebar 60px, back di atas rail; area aksi full tinggi di kanan.
+- `CACHE_VERSION` -> v122.
+
+### v1.23.27
+- Image sheet: background disamakan dengan topbar (`--color-surface`); warna menu disesuaikan (`--color-bg`) agar kontras.
+- `CACHE_VERSION` -> v121.
+
+### v1.23.26
+- Image sheet: gap antar box 5px, border-radius 4px, ukuran card disesuaikan (42 / 96 / 42).
+- `CACHE_VERSION` -> v120.
+
+### v1.23.25
+- Image sheet: tinggi 210px, layout grid baru (align bar, 3 aksi besar, Batal/Terapkan, rail toggle icon); panel Dimensi & Crop sebagai view dalam sheet yang sama.
+- `CACHE_VERSION` -> v119.
+
+### v1.23.24
+- i18n: terjemahkan sisa UI yang masih hardcode Indonesia (font library, trash, cadangkan, fitur AI, search placeholder, tanggal relatif, FAB AI, about, archive empty).
+- Privacy Policy: teks statis bahasa Inggris.
+- `CACHE_VERSION` -> v118.
+
+### v1.23.23
+- Card style: skeleton loading disederhanakan jadi 3 bar full-width (bar atas 4× tinggi 2 bar bawah) — SPA & multi-page.
+- Editor FAB gulir ke bawah: delay auto-focus ke akhir dokumen 1000ms → 300ms; hilangkan blink kursor ke posisi lama saat focusEnd.
+- Outline sidebar: z-index di atas FAB AI; FAB AI disembunyikan saat sidebar terbuka (`is-outline-open`), muncul lagi saat fokus editor.
+- `CACHE_VERSION` -> v117.
 
 ### v1.23.19
 - Notes list: menu titik-tiga di kartu biasa & pinned background transparan

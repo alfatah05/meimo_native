@@ -120,8 +120,23 @@ export function safeFileNameFromTitle(title) {
 }
 
 async function triggerBlobDownload(blob, fileName) {
-  const { saveToDownloads } = await import("../native/capacitor-bridge.js");
-  return saveToDownloads(blob, fileName, blob.type || "application/octet-stream");
+  // Native: simpan ke Downloads / Share sheet via Capacitor bridge.
+  // Web/PWA: fallback <a download>. Dynamic import → kode native terpisah.
+  try {
+    const { saveToDownloads } = await import("../native/capacitor-bridge.js");
+    return await saveToDownloads(blob, fileName, blob.type || "application/octet-stream");
+  } catch (_) {
+    // bridge gagal / bukan native → browser download
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  return { path: fileName, native: false };
 }
 
 /**
@@ -193,7 +208,7 @@ export async function exportNoteAsMeimo(doc) {
   const zipBlob = new Blob([bytes], { type: MEIMO_MIME_TYPE });
 
   const fileName = `${safeFileNameFromTitle(doc.title)}.meimo`;
-  const saveResult = await triggerBlobDownload(zipBlob, fileName);
+  await triggerBlobDownload(zipBlob, fileName);
 
-  return { assetCount, fileName, saveResult };
+  return { assetCount, fileName };
 }

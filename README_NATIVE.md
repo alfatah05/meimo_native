@@ -1,39 +1,71 @@
-# Meimo Native (Capacitor Android)
+# Meimo — Web PWA + Capacitor Native
 
-Siap push ke GitHub. Actions otomatis build APK (Node 22 + Java 21).
+Satu codebase, dua target:
 
-## Fix error `webDir "." is not valid`
+| Target | Cara jalan | Storage | Download file |
+|--------|------------|---------|---------------|
+| **Web / PWA** | Serve folder root (atau `www/`) lewat HTTP | IndexedDB | `<a download>` |
+| **Android native** | Capacitor + WebView | Filesystem (`Directory.Data`) | MeimoFileSaver / Share |
 
-Sudah diperbaiki: `webDir` = `www`. Script `scripts/prepare-www.sh` menyalin file web ke folder `www/` sebelum `cap sync`.
+## Pemisahan kode
 
-## Quick start lokal
+- **Kode base web** (tidak berubah perilaku di browser): HTML, `src/js/**` kecuali modul di bawah.
+- **Penyesuaian native** (hanya aktif jika `Capacitor.isNativePlatform()`):
+  - `src/js/native/capacitor-bridge.js` — StatusBar, back button, `saveToDownloads`
+  - `src/js/native/multi-page-back.js` — hardware back di halaman non-SPA
+  - `src/js/db/fs-storage.js` — penyimpanan Filesystem
+  - `src/js/db/migrate-to-fs.js` — migrasi sekali IDB → FS
+  - Dual-path di `notes-repository.js`, `fonts-repository.js`, `settings-repository.js` (`useFs()`)
+  - Dynamic import di `spa-app.js`, `theme-manager.js`, `meimo-export.js`, `backup-service.js`
+
+Di browser, `isNative()` selalu `false` → jalur IndexedDB + download browser tetap dipakai. Tidak ada dependency runtime ke Capacitor di web.
+
+## Quick start — Web / PWA
+
+```bash
+# Cukup serve folder project (atau isi www/ setelah prepare)
+npx serve .
+# atau: python3 -m http.server 8080
+```
+
+Manifest + service worker sudah ada (`manifest.json`, `service-worker.js`).
+
+## Quick start — Android native
 
 ```bash
 npm install --legacy-peer-deps
-npm run prepare:www          # buat folder www/
+npm run prepare:www          # salin file web → www/ (webDir Capacitor)
 npx cap add android          # sekali saja
-npx cap sync android
+npm run assets               # generate icon/splash dari resources/
+npm run cap:sync             # prepare + cap sync + patch Android (plugins, permission)
 npx cap open android
+# atau: npm run android:debug
 ```
 
-Atau satu perintah:
+### Icon
+
+Icon diambil dari versi native stabil (`resources/icon.png`, `resources/icon-only.png`, `resources/splash.png`) — sama dengan `meimo_native_old_ver`.
+
 ```bash
-npm run cap:sync
+npm run assets
 ```
+
+### Plugin kustom Android
+
+`android-patches/` berisi:
+
+- `MainActivity.java` — register plugin
+- `MeimoFileSaverPlugin.java` — simpan ke Downloads
+- `MeimoSystemBarsPlugin.java` / `NavigationBarPlugin.java` — warna system bars
+- `MeimoPermissionsPlugin.java`
+- `patch-android.sh` — dijalankan otomatis lewat `npm run cap:sync`
+
+## Versi
+
+- Web base: **1.23.51** (`meimo_web_v1_23_51`)
+- Native stack: Capacitor 6 (mengikuti pola stabil `meimo_native_old_ver`)
+- App ID: `com.meimo.app`
 
 ## GitHub Actions
 
-Push ke `main`/`master` → workflow **Build Android APK**:
-1. Node 22 + Java 21
-2. `npm install` → `prepare:www` → `cap add` → `cap sync`
-3. `./gradlew assembleDebug`
-4. Artifact: **meimo-android-debug**
-
-## Fitur native
-
-- Hardware back → history.back() + animasi View Transitions sama
-- StatusBar/NavBar warna = tema (cold start + ganti tema)
-- Splash `#1E1E1E`
-- Safe-area padding
-- Download .meimo / .zip ke folder Download Android
-- Storage dual: Filesystem (native) / IndexedDB (web)
+Workflow `.github/workflows/android.yml` build APK debug saat push ke main/master.

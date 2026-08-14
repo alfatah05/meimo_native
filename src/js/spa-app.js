@@ -170,26 +170,25 @@ async function ensureEditor() {
  */
 async function ensureSecondary(name, importPath, initExport, opts = {}) {
   // 1) Restore template (skeleton terlihat lagi) + tampilkan view SEGERA
+  //    (bagian sync ini sudah dipanggil di onRoute; tetap aman dipanggil ulang)
   restoreTemplate(name);
   showView(name);
 
-  // 2) Halaman berat (card-style): JANGAN import modul selama View Transition.
-  //    Parse/compile note-card + presets + font-service di main thread
-  //    tabrakan dengan animasi page-in → patah-patah selama skeleton tampil.
+  // 2) Mulai fetch modul segera (paralel dengan animasi)
+  const modPromise = import(importPath);
+
+  // 3) Untuk halaman berat: tunggu page transition selesai dulu supaya
+  //    mutasi DOM di init tidak tabrakan dengan animasi translateY.
   if (opts.waitTransition) {
     try {
       const { waitForPageTransition } = await import("./router.js");
-      await Promise.race([
-        waitForPageTransition(),
-        new Promise((r) => setTimeout(r, 500)),
-      ]);
+      await waitForPageTransition();
     } catch (_) {
       /* ignore */
     }
   }
 
-  // 3) Baru sekarang fetch + init modul
-  const mod = await import(importPath);
+  const mod = await modPromise;
   if (typeof mod[initExport] === "function") {
     await mod[initExport]();
   }
@@ -294,7 +293,8 @@ async function bootSpa() {
     console.warn("[spa] i18n init failed", e);
   }
 
-  // Native: init Capacitor + migrasi IDB→Filesystem SEBELUM router/notes load
+  // Native (Capacitor only): init bridge + optional IDB→Filesystem migration.
+  // Dynamic import keeps the web/PWA path clean — modules load but isNative() is false.
   try {
     const bridge = await import("./native/capacitor-bridge.js");
     await bridge.initNative();
@@ -321,17 +321,13 @@ async function bootSpa() {
 
   initRouter({ onRoute });
 
-  // Prefetch modul halaman berat di idle — buka berikutnya lebih instan.
+  // Prefetch modul berat di idle (sama seperti native stabil)
   const preloadHeavy = () => {
     import("./fonts/font-manager.js").catch(() => {});
     import("./notes/card-style.js").catch(() => {});
     import("./services/font-service.js")
       .then((m) => {
-        // Warm meta cache saja (murah). Jangan FontFace-kan semua font di
-        // background — bikin jank & boros memori saat user install banyak.
-        if (m.getInstalledFontsMeta) {
-          m.getInstalledFontsMeta().catch(() => {});
-        }
+        if (m.getInstalledFontsMeta) m.getInstalledFontsMeta().catch(() => {});
       })
       .catch(() => {});
   };
@@ -340,7 +336,6 @@ async function bootSpa() {
   } else {
     setTimeout(preloadHeavy, 800);
   }
-
 
   import("./pwa/sw-register.js").catch(() => {});
   import("./pwa/install-prompt.js").catch(() => {});

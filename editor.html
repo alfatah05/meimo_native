@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" data-theme="light">
+<html lang="id" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -298,19 +298,21 @@
         id="editorTitle"
         class="note-title-field"
         contenteditable="true"
-        data-placeholder="Judul Catatan"
+        data-placeholder="Note title"
+        data-i18n-attr="data-placeholder:editor.title.placeholder,aria-label:editor.title.aria"
         role="textbox"
         aria-multiline="false"
-        aria-label="Judul catatan"
+        aria-label="Note title"
       ></div>
       <div
         id="editorBody"
         class="note-body-field"
         contenteditable="true"
-        data-placeholder="Mulai menulis di sini…"
+        data-placeholder="Start writing here…"
+        data-i18n-attr="data-placeholder:editor.body.placeholder,aria-label:editor.body.aria"
         role="textbox"
         aria-multiline="true"
-        aria-label="Isi catatan"
+        aria-label="Note content"
       ></div>
     </div>
   </div>
@@ -328,5 +330,6 @@
 <script type="module" src="/src/js/pwa/install-prompt.js"></script>
 <script type="module" src="/src/js/utils/native-feel.js"></script>
 
+<script type="module" src="/src/js/native/multi-page-back.js"></script>
 </body>
 </html>

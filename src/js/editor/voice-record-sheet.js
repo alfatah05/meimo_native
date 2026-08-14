@@ -16,6 +16,7 @@ import { insertPastedText } from "./commands.js";
 import { isVoidBlockType, blockTextLength } from "./block-model.js";
 import * as selectionApi from "./selection.js";
 import { showToast } from "../../components/toast.js";
+import { t, getLanguage } from "../i18n/i18n.js";
 
 const CLOSE_ANIM_MS = 180;
 const SpeechRecognition =
@@ -126,7 +127,7 @@ function appendTranscriptLines(editor, state, lines) {
 
 export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
   if (!SpeechRecognition) {
-    showToast("Browser ini tidak mendukung pengenalan suara.");
+    showToast(t("voice.unsupported"));
     return;
   }
 
@@ -173,11 +174,11 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
   const titleGroup = createEl("div", { className: "voice-record-sheet__title-group" });
   const titleEl = createEl("div", {
     className: "voice-record-sheet__title",
-    text: "Merekam percakapan",
+    text: t("voice.title"),
   });
   const statusEl = createEl("div", {
     className: "voice-record-sheet__status",
-    text: "Mendengarkan…",
+    text: t("voice.listening"),
   });
   titleGroup.append(titleEl, statusEl);
 
@@ -201,12 +202,12 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
   const pauseBtn = createEl("button", {
     className: "voice-record-sheet__btn voice-record-sheet__btn--ghost",
     type: "button",
-    text: "Jeda",
+    text: t("voice.pause"),
   });
   const finishBtn = createEl("button", {
     className: "voice-record-sheet__btn voice-record-sheet__btn--primary",
     type: "button",
-    text: "Selesai",
+    text: t("voice.done"),
   });
   actions.append(pauseBtn, finishBtn);
 
@@ -316,8 +317,8 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
   function setPaused(next) {
     isPaused = next;
     sheet.classList.toggle("is-paused", isPaused);
-    pauseBtn.textContent = isPaused ? "Lanjut" : "Jeda";
-    statusEl.textContent = isPaused ? "Dijeda" : "Mendengarkan…";
+    pauseBtn.textContent = isPaused ? t("voice.resume") : t("voice.pause");
+    statusEl.textContent = isPaused ? t("voice.paused") : t("voice.listening");
     if (isPaused) {
       pauseTimer();
       if (interimText.trim()) {
@@ -359,7 +360,8 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
     lastProcessedIndex = -1;
 
     recognition = new SpeechRecognition();
-    recognition.lang = "id-ID";
+    const lang = getLanguage();
+    recognition.lang = lang === "ja" ? "ja-JP" : lang === "id" ? "id-ID" : "en-US";
     // continuous=false lebih stabil anti-duplikat di Chrome mobile:
     // setiap final = satu frase, lalu kita restart manual.
     // Tetap real-time karena restart segera setelah onend.
@@ -376,13 +378,13 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
       const code = event.error || "";
       if (code === "aborted" || code === "no-speech") return;
       if (code === "not-allowed" || code === "service-not-allowed") {
-        showError("Izin mikrofon ditolak. Izinkan akses mic di browser.");
-        statusEl.textContent = "Izin ditolak";
+        showError(t("voice.err.micDenied"));
+        statusEl.textContent = t("voice.status.denied");
         setPaused(true);
         return;
       }
       if (code === "network") {
-        showError("Butuh koneksi internet untuk transkripsi.");
+        showError(t("voice.err.offline"));
         return;
       }
       console.warn("SpeechRecognition error:", code);
@@ -413,7 +415,7 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
     try {
       recognition.start();
     } catch (err) {
-      showError("Tidak bisa memulai pengenalan suara.");
+      showError(t("voice.err.start"));
       console.error(err);
     }
   }
@@ -429,7 +431,7 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
       updatePreview("");
     }
     close({ finished: true });
-    showToast("Perekaman selesai.");
+    showToast(t("voice.finished"));
   });
 
   registerActiveSheet(doCancel);
@@ -440,51 +442,22 @@ export function openVoiceRecordSheet({ editor, state, onFinished } = {}) {
 
   startTimer();
 
-  (async function requestMicThenStart() {
-    try {
-      const Cap = window.Capacitor;
-      const isNative = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
-      const plug = Cap?.Plugins?.MeimoPermissions;
-      console.log("[voice] native=", isNative, "plugins=", Object.keys(Cap?.Plugins || {}), "MeimoPermissions=", !!plug);
-      if (isNative) {
-        if (!plug?.requestMicrophone) {
-          showError("Plugin mikrofon tidak terpasang. Install ulang APK terbaru dari build.");
-          statusEl.textContent = "Plugin hilang";
-          setPaused(true);
-          return;
-        }
-        const res = await plug.requestMicrophone();
-        console.log("[voice] requestMicrophone result", res);
-        if (res && res.granted === false) {
-          showError("Izin mikrofon ditolak. Buka Pengaturan → Aplikasi → Meimo → Izin → Mikrofon.");
-          statusEl.textContent = "Izin ditolak";
-          setPaused(true);
-          return;
-        }
-      }
-    } catch (e) {
-      console.warn("MeimoPermissions.requestMicrophone:", e);
-      showError("Gagal meminta izin mikrofon: " + (e?.message || e));
-      statusEl.textContent = "Error izin";
-      setPaused(true);
-      return;
-    }
-
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
         stream.getTracks().forEach((t) => t.stop());
         if (!isClosed) setupRecognition();
-      } catch (err) {
+      })
+      .catch((err) => {
         console.warn("getUserMedia:", err);
-        showError("Izin mikrofon diperlukan untuk merekam.");
-        statusEl.textContent = "Izin ditolak";
+        showError(t("voice.err.micRequired"));
+        statusEl.textContent = t("voice.status.denied");
         setPaused(true);
-      }
-    } else {
-      setupRecognition();
-    }
-  })();
+      });
+  } else {
+    setupRecognition();
+  }
 }
 
 export function shouldAutoOpenVoiceRecord() {

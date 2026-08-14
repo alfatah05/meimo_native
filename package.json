@@ -1,13 +1,13 @@
 {
   "name": "meimo",
-  "version": "1.24.0",
-  "description": "Meimo \u2014 Catatan Pribadi native (Capacitor)",
+  "version": "1.23.51",
+  "description": "Meimo — Catatan Pribadi (Web PWA + Capacitor Native)",
   "main": "index.html",
   "scripts": {
     "prepare:www": "bash scripts/prepare-www.sh",
     "build": "npm run prepare:www",
     "cap:add": "npm run prepare:www && npx cap add android",
-    "cap:sync": "npm run prepare:www && npx cap sync android",
+    "cap:sync": "npm run prepare:www && npx cap sync android && bash android-patches/patch-android.sh",
     "cap:open": "npx cap open android",
     "cap:run": "npm run prepare:www && npx cap run android",
     "android:debug": "cd android && ./gradlew assembleDebug",
@@ -15,13 +15,7 @@
     "android:bundle": "cd android && ./gradlew bundleRelease",
     "assets": "capacitor-assets generate --android --assetPath resources --iconBackgroundColor '#1E1E1E' --iconBackgroundColorDark '#1E1E1E' --splashBackgroundColor '#1E1E1E' --splashBackgroundColorDark '#1E1E1E'"
   },
-  "keywords": [
-    "notes",
-    "capacitor",
-    "pwa",
-    "offline",
-    "meimo"
-  ],
+  "keywords": ["notes", "capacitor", "pwa", "offline", "meimo"],
   "author": "Meimo",
   "license": "ISC",
   "type": "module",

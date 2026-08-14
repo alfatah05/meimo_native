@@ -143,15 +143,10 @@ body.is-block-select-mode .outline-fab {
 
 /* ---- Overlay + sidebar ---- */
 
-/* z-index SENGAJA var(--z-fab) — lebih RENDAH dari .note-topbar
-   (var(--z-toolbar), lihat layout.css). Konsekuensinya: topbar (yang
-   punya background sendiri) selalu tergambar DI ATAS overlay & sidebar
-   ini, jadi sidebar tidak pernah bisa menutupi topbar walau posisinya
-   "top: 0" secara CSS. Sidebar diberi padding-top setinggi topbar (lihat
-   .outline-sidebar di bawah) supaya isinya sendiri juga tidak start
-   ketiban topbar secara visual. */
-/* z-index di atas .ai-fab (var(--z-fab)=20) supaya sidebar + backdrop
-   menutupi FAB AI; tetap di bawah .note-topbar (var(--z-toolbar)=30). */
+/* z-index di antara --z-fab (20) dan --z-toolbar (30): lebih TINGGI dari
+   FAB AI supaya sidebar menutupi FAB saat terbuka, tapi tetap LEBIH RENDAH
+   dari .note-topbar sehingga topbar tidak ketutup. Sidebar tetap pakai
+   padding-top setinggi topbar. */
 .outline-overlay {
   position: fixed;
   inset: 0;

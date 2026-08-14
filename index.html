@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -130,14 +130,14 @@
     <div class="home-greeting-row">
       <div class="home-greeting" data-i18n="home.title">My Notes</div>
       <div class="home-header-actions">
-        <a href="/arsip" class="home-about-btn" aria-label="Buka Arsip">
+        <a href="/arsip" class="home-about-btn" aria-label="Open Archive" data-i18n-aria="nav.archive">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="21 8 21 21 3 21 3 8"></polyline>
             <rect x="1" y="3" width="22" height="5"></rect>
             <line x1="10" y1="12" x2="14" y2="12"></line>
           </svg>
         </a>
-        <a href="/about.html" class="home-about-btn" aria-label="Tentang aplikasi">
+        <a href="/about" class="home-about-btn" aria-label="About the app" data-i18n-aria="nav.about">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="9"></circle>
             <line x1="12" y1="11" x2="12" y2="16.5"></line>
@@ -158,8 +158,8 @@
         type="text"
         inputmode="search"
         autocomplete="off"
-        placeholder="Cari judul atau isi catatan…"
-        aria-label="Cari catatan berdasarkan judul atau isi"
+        placeholder="Search title or note content…" data-i18n-placeholder="home.search.placeholder"
+        aria-label="Search notes by title or content" data-i18n-aria="home.search.aria"
       >
       <button
         type="button"
@@ -546,19 +546,21 @@
         id="editorTitle"
         class="note-title-field"
         contenteditable="true"
-        data-placeholder="Judul Catatan"
+        data-placeholder="Note title"
+        data-i18n-attr="data-placeholder:editor.title.placeholder,aria-label:editor.title.aria"
         role="textbox"
         aria-multiline="false"
-        aria-label="Judul catatan"
+        aria-label="Note title"
       ></div>
       <div
         id="editorBody"
         class="note-body-field"
         contenteditable="true"
-        data-placeholder="Mulai menulis di sini…"
+        data-placeholder="Start writing here…"
+        data-i18n-attr="data-placeholder:editor.body.placeholder,aria-label:editor.body.aria"
         role="textbox"
         aria-multiline="true"
-        aria-label="Isi catatan"
+        aria-label="Note content"
       ></div>
     </div>
   </div>
@@ -607,7 +609,7 @@
           </span>
           <span class="backup-action-btn__text">
             <span class="backup-action-btn__title" data-i18n="backup.exportAll">Back up all notes</span>
-            <span class="backup-action-btn__desc">Unduh semua catatan sebagai .meimo (dengan gambar/musik), dibungkus satu file .zip</span>
+            <span class="backup-action-btn__desc" data-i18n="backup.exportAll.desc">Download a .zip of all notes and assets.</span>
           </span>
         </button>
 
@@ -633,7 +635,7 @@
           </span>
           <span class="backup-action-btn__text">
             <span class="backup-action-btn__title" data-i18n="backup.importZip">Import backup (.zip)</span>
-            <span class="backup-action-btn__desc">Masukkan satu file .zip cadangan, semua .meimo di dalamnya langsung diimpor sekaligus</span>
+            <span class="backup-action-btn__desc" data-i18n="backup.importZip.desc">Restore notes from a Meimo backup zip.</span>
           </span>
         </button>
         <input type="file" id="importBackupZipInput" accept=".zip" hidden>
@@ -763,7 +765,7 @@
       <div class="section-header">
         <span class="section-title">Font Library</span>
       </div>
-      <p class="font-manager-hint">Unduh font tambahan untuk dipakai di editor. Sekali diunduh, font tetap tersimpan di perangkat ini walau offline.</p>
+      <p class="font-manager-hint" data-i18n="fonts.library.desc">Download extra fonts for the editor. Once downloaded, fonts stay on this device offline.</p>
       <div id="libraryFontList" class="font-manager-list" hidden></div>
       <div id="libraryFontPagination" class="font-manager-pagination" hidden></div>
     </section>
@@ -777,7 +779,7 @@
         <line x1="34" y1="68" x2="50" y2="68"></line>
       </svg>
       <div class="empty-state__title" data-i18n="fonts.library.empty">Font Library is empty</div>
-      <p class="empty-state__desc">Belum ada font tambahan yang bisa diunduh. Tambahkan lewat assets/fonts/library/manifest.json.</p>
+      <p class="empty-state__desc" data-i18n="fonts.library.empty.desc">No extra fonts available to download yet.</p>
     </div>
 
     <!-- ============ FONT KUSTOM (UNGGAH) ============
@@ -790,7 +792,7 @@
       <div class="section-header">
         <span class="section-title" data-i18n="fonts.custom">Custom fonts (upload)</span>
       </div>
-      <p class="font-manager-hint">Unggah berkas font sendiri (.ttf, .otf, .woff, .woff2) dari perangkat ini untuk dipakai di editor.</p>
+      <p class="font-manager-hint" data-i18n="fonts.custom.hint">Upload your own font files (.ttf, .otf, .woff, .woff2) from this device to use in the editor.</p>
 
       <button type="button" id="btnUploadFont" class="font-manager-upload-btn">
         <span class="font-manager-upload-btn__icon">
@@ -861,7 +863,7 @@
         <line x1="40" y1="50" x2="56" y2="50"></line>
       </svg>
       <div class="empty-state__title" data-i18n="archive.empty.title">Archive is empty</div>
-      <p class="empty-state__desc">Catatan yang kamu arsipkan akan muncul di sini dan tidak lagi tampil di daftar utama.</p>
+      <p class="empty-state__desc" data-i18n="archive.empty.desc">Archived notes will appear here.</p>
     </div>
 
   </main>
@@ -909,10 +911,10 @@
          Sampah). Ditampilkan by default sejak first paint (tanpa nunggu
          JS), disembunyikan begitu render pertama selesai (lihat boot()
          di card-style.js). -->
-    <div id="cardStyleSkeleton" class="list-skeleton skeleton-overlay card-style-skeleton--simple" aria-hidden="true">
-      <div class="skeleton-bar list-skeleton__row"></div>
-      <div class="skeleton-bar list-skeleton__row"></div>
-      <div class="skeleton-bar list-skeleton__row"></div>
+    <div id="cardStyleSkeleton" class="card-style-skeleton skeleton-overlay" aria-hidden="true">
+      <div class="skeleton-bar card-style-skeleton__bar card-style-skeleton__bar--tall"></div>
+      <div class="skeleton-bar card-style-skeleton__bar"></div>
+      <div class="skeleton-bar card-style-skeleton__bar"></div>
     </div>
 
     <section class="section">
@@ -941,39 +943,60 @@
 
     <section class="section">
       <div class="section-header">
-        <span class="section-title" data-i18n="cardStyle.bgColor">Background color</span>
+        <span class="section-title" data-i18n="cardStyle.background">Background</span>
       </div>
-      <div class="card-style-color-scroll">
-        <div id="bgColorList" class="card-style-color-scroll__presets"></div>
-        <label class="card-style-color-swatch card-style-color-swatch--custom" title="Warna kustom">
-          <input type="color" id="bgColorCustom" value="#4A55C7">
-        </label>
+      <div class="card-style-bg-card">
+        <div class="card-style-bg-tabs" role="tablist" aria-label="Background type">
+          <button type="button" class="card-style-bg-tab is-active" role="tab" id="bgTabNone" data-tab="none" aria-selected="true" data-i18n="cardStyle.bgTab.none">None</button>
+          <button type="button" class="card-style-bg-tab" role="tab" id="bgTabColor" data-tab="color" aria-selected="false" data-i18n="cardStyle.bgTab.color">Color</button>
+          <button type="button" class="card-style-bg-tab" role="tab" id="bgTabImage" data-tab="image" aria-selected="false" data-i18n="cardStyle.bgTab.image">Image</button>
+        </div>
+
+        <!-- Panel None: kosong, tinggi tetap -->
+        <div class="card-style-bg-panel is-active" id="bgPanelNone" data-panel="none" role="tabpanel">
+          <div class="card-style-bg-panel__empty" aria-hidden="true"></div>
+        </div>
+
+        <!-- Panel Color: opacity + custom + presets -->
+        <div class="card-style-bg-panel" id="bgPanelColor" data-panel="color" role="tabpanel" hidden>
+          <div class="card-style-bg-opacity" id="bgColorOpacityRow">
+            <span class="card-style-bg-opacity__icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none" opacity="0.35"/></svg>
+            </span>
+            <input type="range" id="bgColorOpacity" min="0" max="1" step="0.01" value="1" aria-label="Color opacity">
+            <span class="card-style-bg-opacity__value" id="bgColorOpacityValue">100%</span>
+            <label class="card-style-bg-custom" title="Custom color" data-i18n-attr="title:cardStyle.customColor">
+              <input type="color" id="bgColorCustom" value="#4A55C7" aria-label="Custom color">
+            </label>
+          </div>
+          <div id="bgColorList" class="card-style-bg-presets"></div>
+        </div>
+
+        <!-- Panel Image: opacity + upload/remove chips -->
+        <div class="card-style-bg-panel" id="bgPanelImage" data-panel="image" role="tabpanel" hidden>
+          <div class="card-style-bg-opacity" id="bgImageOpacityRow">
+            <span class="card-style-bg-opacity__icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none" opacity="0.35"/></svg>
+            </span>
+            <input type="range" id="bgImageOpacity" min="0" max="1" step="0.01" value="1" aria-label="Image opacity">
+            <span class="card-style-bg-opacity__value" id="bgImageOpacityValue">100%</span>
+          </div>
+          <div class="card-style-bg-image-actions">
+            <input type="file" id="bgImageInput" accept="image/*" hidden>
+            <button type="button" id="bgImageUploadBtn" class="card-style-bg-chip card-style-bg-chip--primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <span data-i18n="cardStyle.uploadImage">Upload image</span>
+            </button>
+            <button type="button" id="bgImageRemoveBtn" class="card-style-bg-chip card-style-bg-chip--danger" hidden>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span data-i18n="cardStyle.removeImage">Remove image</span>
+            </button>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="section">
-      <div class="section-header">
-        <span class="section-title" data-i18n="cardStyle.bgImage">Background image <span class="card-style-optional-tag" data-i18n="cardStyle.optional">(optional)</span></span>
-      </div>
-      <div class="card-style-bg-image">
-        <input type="file" id="bgImageInput" accept="image/*" hidden>
-        <button type="button" id="bgImageUploadBtn" class="card-style-btn card-style-btn--primary">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-          <span data-i18n="cardStyle.uploadImage">Upload image</span>
-        </button>
-        <button type="button" id="bgImageRemoveBtn" class="card-style-btn card-style-btn--danger" hidden>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
-          <span data-i18n="cardStyle.removeImage">Remove image</span>
-        </button>
-      </div>
-      <div id="bgImageOpacityRow" class="card-style-opacity-row" hidden>
-        <label for="bgImageOpacity" class="card-style-opacity-row__label" data-i18n="cardStyle.opacity">Opacity</label>
-        <input type="range" id="bgImageOpacity" min="0" max="1" step="0.05" value="1">
-        <span id="bgImageOpacityValue" class="card-style-opacity-row__value">100%</span>
-      </div>
-    </section>
-
-    <section class="section">
+<section class="section">
       <div class="card-style-toggle-row">
         <div class="card-style-toggle-row__text">
           <span class="section-title" data-i18n="cardStyle.hideSnippet">Hide note content</span>
@@ -1160,7 +1183,7 @@
         <div class="settings-field">
           <label class="settings-field__label" for="settingsAiApiKey" data-i18n="ai.apiKey">Gemini API key</label>
           <div class="settings-field__row">
-            <input id="settingsAiApiKey" class="settings-input" type="password" autocomplete="off" spellcheck="false" placeholder="Tempel API key Google AI Studio…" />
+            <input id="settingsAiApiKey" class="settings-input" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Google AI Studio API key…" data-i18n-placeholder="ai.placeholder" />
             <button type="button" class="settings-ghost-btn" id="settingsAiToggleKey" aria-pressed="false" data-i18n="ai.show">Show</button>
           </div>
         </div>
@@ -1182,49 +1205,51 @@
       <ol class="ai-tutorial-list">
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">1</span> Buka Google AI Studio</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image1.png" alt="Buka Google AI Studio" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">1</span> <span data-i18n="ai.how1">Open Google AI Studio</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image1.png" alt="Open Google AI Studio" data-i18n-attr="alt:ai.how1" width="512" height="512" loading="lazy" />
           </figure>
         </li>
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">2</span> Buka sidebar</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image2.png" alt="Buka sidebar" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">2</span> <span data-i18n="ai.how2">Open the sidebar</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image2.png" alt="Open the sidebar" data-i18n-attr="alt:ai.how2" width="512" height="512" loading="lazy" />
           </figure>
         </li>
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">3</span> Buka menu API key</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image3.png" alt="Buka menu API key" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">3</span> <span data-i18n="ai.how3">Open the API key menu</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image3.png" alt="Open the API key menu" data-i18n-attr="alt:ai.how3" width="512" height="512" loading="lazy" />
           </figure>
         </li>
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">4</span> Klik Buat kunci API</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image4.png" alt="Klik Buat kunci API" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">4</span> <span data-i18n="ai.how4">Click Create API key</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image4.png" alt="Click Create API key" data-i18n-attr="alt:ai.how4" width="512" height="512" loading="lazy" />
           </figure>
         </li>
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">5</span> Klik Buat kunci</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image5.png" alt="Klik Buat kunci" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">5</span> <span data-i18n="ai.how5">Click Create key</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image5.png" alt="Click Create key" data-i18n-attr="alt:ai.how5" width="512" height="512" loading="lazy" />
           </figure>
         </li>
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">6</span> Salin kunci API</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image6.png" alt="Salin kunci API" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">6</span> <span data-i18n="ai.how6">Copy the API key</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image6.png" alt="Copy the API key" data-i18n-attr="alt:ai.how6" width="512" height="512" loading="lazy" />
           </figure>
         </li>
                 <li class="ai-tutorial-step">
           <figure class="ai-tutorial-step__figure">
-            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">7</span> Paste kunci API ke Meimo</figcaption>
-            <img class="ai-tutorial-step__img" src="/assets/images/image7.png" alt="Paste kunci API ke Meimo" width="512" height="512" loading="lazy" />
+            <figcaption class="ai-tutorial-step__label"><span class="ai-tutorial-step__num">7</span> <span data-i18n="ai.how7">Paste the API key into Meimo</span></figcaption>
+            <img class="ai-tutorial-step__img" src="/assets/images/image7.png" alt="Paste the API key into Meimo" data-i18n-attr="alt:ai.how7" width="512" height="512" loading="lazy" />
           </figure>
         </li>
       </ol>
       <p class="settings-field__hint ai-tutorial-hint">
-        Buka <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a> untuk membuat kunci, lalu tempel di kolom di atas.
+        <span data-i18n="ai.howFooter.before">Open</span>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>
+        <span data-i18n="ai.howFooter.after">to create a key, then paste it in the field above.</span>
       </p>
     </section>
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id" data-theme="light">
+<html lang="id" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <style>
@@ -71,7 +71,7 @@
 
   <header class="home-header">
     <div style="display:flex; align-items:center; gap: var(--space-sm);">
-      <a href="/index.html" class="note-back-btn" aria-label="Back" data-i18n-aria="nav.back">
+      <a href="/library" class="note-back-btn" aria-label="Back" data-i18n-aria="nav.back">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <line x1="19" y1="12" x2="5" y2="12"></line>
           <polyline points="12 19 5 12 12 5"></polyline>
@@ -91,8 +91,8 @@
 
     <section class="about-section">
       <div class="about-section__title" data-i18n="about.descTitle">App description</div>
-      <p>Meimo adalah aplikasi catatan pribadi yang bisa kamu pasang di ponsel atau komputer. Semua catatan disimpan langsung di perangkatmu — tidak dikirim ke server kami — jadi isinya tetap privat dan sepenuhnya di tanganmu.</p>
-      <p>Editornya mendukung format teks modern, gambar, scene, musik, rekam suara, hingga bantuan AI. Kamu juga bisa mengganti tema, font, mencadangkan data, dan menata catatan dengan arsip atau sampah.</p>
+      <p data-i18n="about.desc.p1">Meimo is a personal notes app you can install on your phone or computer. All notes are stored on your device — not sent to our servers — so your content stays private and fully under your control.</p>
+      <p data-i18n="about.desc.p2">The editor supports modern text formatting, images, scenes, music, voice recording, and AI assistance. You can also change themes, fonts, back up data, and organize notes with archive or trash.</p>
     </section>
 
     <section class="about-section">
@@ -103,7 +103,7 @@
           <svg class="about-feature__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"></path>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.editor">Rich text editor</strong>: tebal, miring, garis bawah, judul, daftar, kutipan, garis pemisah, tautan, warna teks &amp; sorotan, plus font kustom.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.editor">Rich text editor</strong><span data-i18n="about.feat.editor.desc">: bold, italic, underline, headings, lists, quotes, dividers, links, text color &amp; highlight, plus custom fonts.</span></div>
         </div>
 
         <div class="about-feature">
@@ -112,7 +112,7 @@
             <circle cx="8.5" cy="8.5" r="1.5"></circle>
             <path d="M21 15l-5-5L5 21"></path>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.media">Images, scenes &amp; music</strong>: sisipkan gambar, blok scene berwarna, dan musik latar per bagian catatan.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.media">Images, scenes &amp; music</strong><span data-i18n="about.feat.media.desc">: insert images, colored scene blocks, and background music per note section.</span></div>
         </div>
 
         <div class="about-feature">
@@ -122,7 +122,7 @@
             <line x1="12" y1="19" x2="12" y2="22"></line>
             <line x1="8" y1="22" x2="16" y2="22"></line>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.voice">Voice to text</strong>: rekam percakapan dan hasilnya langsung tertulis di catatan baru.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.voice">Voice to text</strong><span data-i18n="about.feat.voice.desc">: record speech and have it written into a new note.</span></div>
         </div>
 
         <div class="about-feature">
@@ -131,7 +131,7 @@
             <path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z"></path>
             <path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"></path>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.ai">AI assistant</strong>: tulis atau sunting bagian catatan dengan Gemini — memakai kunci API milikmu sendiri dari halaman Fitur AI.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.ai">AI assistant</strong><span data-i18n="about.feat.ai.desc">: write or edit note sections with Gemini — using your own API key from the AI Features page.</span></div>
         </div>
 
         <div class="about-feature">
@@ -146,7 +146,7 @@
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.theme">Themes &amp; fonts</strong>: lima tema tampilan (Terang, Gelap, Sepia, Kertas, OLED) dan pustaka font yang bisa diunduh atau diunggah.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.theme">Themes &amp; fonts</strong><span data-i18n="about.feat.theme.desc">: five display themes (Light, Dark, Sepia, Paper, OLED) and a font library you can download or upload.</span></div>
         </div>
 
         <div class="about-feature">
@@ -155,7 +155,7 @@
             <path d="M7 10l5 5 5-5"></path>
             <path d="M4 19h16"></path>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.backup">Backup &amp; import</strong>: unduh semua catatan (dengan gambar/musik) sebagai file cadangan, atau impor kembali kapan saja.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.backup">Backup &amp; import</strong><span data-i18n="about.feat.backup.desc">: download all notes (with images/music) as a backup file, or import them again anytime.</span></div>
         </div>
 
         <div class="about-feature">
@@ -165,7 +165,7 @@
             <path d="M10 11v6"></path>
             <path d="M14 11v6"></path>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.archive">Archive &amp; trash</strong>: arsipkan catatan yang jarang dibuka, atau pulihkan dari sampah sebelum dihapus permanen.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.archive">Archive &amp; trash</strong><span data-i18n="about.feat.archive.desc">: archive notes you open less often, or restore from trash before permanent deletion.</span></div>
         </div>
 
         <div class="about-feature">
@@ -173,7 +173,7 @@
             <rect x="5" y="2" width="14" height="20" rx="2"></rect>
             <path d="M12 18h.01"></path>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.install">Installable on your device</strong>: tambahkan ke layar utama ponsel atau komputer agar terasa seperti aplikasi biasa, lengkap dengan ikon sendiri.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.install">Installable on your device</strong><span data-i18n="about.feat.install.desc">: add to your phone or computer home screen so it feels like a regular app, with its own icon.</span></div>
         </div>
 
         <div class="about-feature">
@@ -181,7 +181,7 @@
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
-          <div class="about-feature__text"><strong data-i18n="about.feat.offline">Works offline</strong>: setelah dibuka sekali saat online, catatan dan sebagian besar fitur tetap tersedia tanpa internet. Fitur AI membutuhkan koneksi.</div>
+          <div class="about-feature__text"><strong data-i18n="about.feat.offline">Works offline</strong><span data-i18n="about.feat.offline.desc">: after opening once online, notes and most features stay available offline. AI features need a connection.</span></div>
         </div>
 
       </div>
@@ -199,10 +199,10 @@
         <div class="about-creator-card__body">
           <div class="about-creator-card__name">Nabil Alfatah</div>
           <div class="about-creator-card__social">
-            <a class="about-social-btn" href="https://github.com/placeholder" target="_blank" rel="noopener noreferrer" aria-label="GitHub kontributor">
+            <a class="about-social-btn" href="https://github.com/placeholder" target="_blank" rel="noopener noreferrer" aria-label="Contributor GitHub" data-i18n-aria="about.aria.github">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.523 2 12 2z"/></svg>
             </a>
-            <a class="about-social-btn" href="https://instagram.com/placeholder" target="_blank" rel="noopener noreferrer" aria-label="Instagram kontributor">
+            <a class="about-social-btn" href="https://instagram.com/placeholder" target="_blank" rel="noopener noreferrer" aria-label="Contributor Instagram" data-i18n-aria="about.aria.instagram">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>
             </a>
           </div>
@@ -211,9 +211,9 @@
     </section>
 
     <div class="about-footer-note">
-      <span>Meimo, Catatan Pribadi</span>
+      <span data-i18n="about.footer">Meimo, Personal Notes</span>
       <span class="about-footer-note__sep" aria-hidden="true">·</span>
-      <a href="/privacy-policy.html" class="about-footer-note__link" data-i18n="about.privacy">Privacy Policy</a>
+      <a href="/privacy-policy" class="about-footer-note__link" data-i18n="about.privacy">Privacy Policy</a>
     </div>
 
   </main>

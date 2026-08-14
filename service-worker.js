@@ -243,7 +243,7 @@
 // tampil, tidak perlu lagi buka halaman Cadangkan & Impor dulu.
 // v79 -> v80: v1.19.2 — fix orb loading AI (denyut icon vs gelombang gak
 // simetris) & auto-scroll ngikutin teks yang lagi diketik AI.
-const CACHE_VERSION = "v113"; // v1.23.19 transparent note menu dots
+const CACHE_VERSION = "v146"; // v1.23.51 virtual rulers wide range
 const APP_SHELL_CACHE = `meimo-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `meimo-runtime-${CACHE_VERSION}`;
 const FONT_CACHE = `meimo-fonts-${CACHE_VERSION}`;

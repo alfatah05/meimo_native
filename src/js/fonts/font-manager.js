@@ -12,7 +12,7 @@
 import {
   BUILTIN_FONTS,
   getFontLibrary,
-  getInstalledFontsMeta,
+  getInstalledFonts,
   getUploadedFonts,
   installFont,
   installCustomFont,
@@ -53,7 +53,7 @@ function renderPagination(container, currentPage, totalItems, onChange) {
 
   const prevBtn = createEl("button", {
     className: "font-manager-pagination__btn",
-    text: "‹ Sebelumnya",
+    text: t("fonts.prev"),
     attrs: { type: "button" },
   });
   prevBtn.disabled = currentPage <= 1;
@@ -61,12 +61,12 @@ function renderPagination(container, currentPage, totalItems, onChange) {
 
   const label = createEl("span", {
     className: "font-manager-pagination__label",
-    text: `Halaman ${currentPage} dari ${totalPages}`,
+    text: t("fonts.page", { current: currentPage, total: totalPages }),
   });
 
   const nextBtn = createEl("button", {
     className: "font-manager-pagination__btn",
-    text: "Berikutnya ›",
+    text: t("fonts.next"),
     attrs: { type: "button" },
   });
   nextBtn.disabled = currentPage >= totalPages;
@@ -94,84 +94,10 @@ function createBuiltinItem(font) {
     })
   );
 
-  const badge = createEl("span", { className: "font-item__badge", text: "Bawaan" });
+  const badge = createEl("span", { className: "font-item__badge", text: t("fonts.builtinBadge") });
 
   item.append(info, badge);
   return item;
-}
-
-/* ------------------------------------------------------------------ */
-/* Lazy preview Font Library (IntersectionObserver)                   */
-/* ------------------------------------------------------------------ */
-// Satu observer bersama untuk semua baris — lebih hemat daripada observer
-// per item. Begitu elemen masuk viewport, muat @font-face preview sekali
-// (lewat ensureLibraryFontPreviewLoaded yang sudah cache di memori + HTTP
-// force-cache), lalu unobserve supaya tidak jalan lagi.
-let previewObserver = null;
-
-function getPreviewObserver() {
-  if (previewObserver) return previewObserver;
-  if (typeof IntersectionObserver === "undefined") {
-    // Fallback: tanpa IO, muat langsung (masih di-cache di font-service).
-    previewObserver = {
-      observe(el) {
-        const font = el._previewFont;
-        const installed = !!el._previewInstalled;
-        if (!font) return;
-        if (installed) {
-          ensureInstalledFontsLoaded({
-            families: [font.family, font.id],
-            deferRest: true,
-            concurrency: 1,
-          }).catch(() => {});
-        } else {
-          ensureLibraryFontPreviewLoaded(font).catch(() => {});
-        }
-        el._previewFont = null;
-        el._previewInstalled = false;
-      },
-      unobserve() {},
-      disconnect() {},
-    };
-    return previewObserver;
-  }
-  previewObserver = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const el = entry.target;
-        const font = el._previewFont;
-        const installed = !!el._previewInstalled;
-        previewObserver.unobserve(el);
-        el._previewFont = null;
-        el._previewInstalled = false;
-        if (!font) continue;
-        if (installed) {
-          // Dari storage (IndexedDB/FS) — prioritas family ini saja.
-          ensureInstalledFontsLoaded({
-            families: [font.family, font.id],
-            deferRest: true,
-            concurrency: 1,
-          }).catch((err) => console.error("Gagal load font terpasang:", err));
-        } else {
-          ensureLibraryFontPreviewLoaded(font).catch((err) => {
-            console.error("Gagal pratinjau font:", err);
-          });
-        }
-      }
-    },
-    {
-      // Mulai load sedikit sebelum baris benar-benar masuk layar
-      rootMargin: "80px 0px",
-      threshold: 0.01,
-    }
-  );
-  return previewObserver;
-}
-
-function observeFontPreview(el) {
-  if (!el || !el._previewFont) return;
-  getPreviewObserver().observe(el);
 }
 
 function createLibraryItem(font, { installed, onChange }) {
@@ -180,7 +106,7 @@ function createLibraryItem(font, { installed, onChange }) {
   const info = createEl("div", { className: "font-item__info" });
   const nameEl = createEl("div", { className: "font-item__name", text: font.name });
   info.appendChild(nameEl);
-  const metaText = font.category ? font.category : "Font tambahan";
+  const metaText = font.category ? font.category : t("fonts.extra");
   info.appendChild(createEl("div", { className: "font-item__meta", text: metaText }));
 
   // Nama font selalu ditampilkan pakai typeface aslinya, baik sudah
@@ -189,26 +115,24 @@ function createLibraryItem(font, { installed, onChange }) {
   // sesi ini — TIDAK ditulis ke IndexedDB. Begitu berkasnya selesai
   // dimuat, browser otomatis me-render ulang teks ini dengan font asli.
   nameEl.style.fontFamily = `"${font.family}"`;
-  // Lazy load face (installed dari storage, atau preview dari URL) saat terlihat.
-  nameEl.dataset.fontPreview = "1";
-  nameEl._previewFont = font;
-  nameEl._previewInstalled = !!installed;
-  observeFontPreview(nameEl);
+  if (!installed) {
+    ensureLibraryFontPreviewLoaded(font);
+  }
 
   const actions = createEl("div", { className: "font-item__actions" });
 
   if (installed) {
-    actions.appendChild(createEl("span", { className: "font-item__badge font-item__badge--installed", text: "Terpasang" }));
+    actions.appendChild(createEl("span", { className: "font-item__badge font-item__badge--installed", text: t("fonts.installed") }));
     const removeBtn = createEl("button", {
       className: "font-item__btn font-item__btn--danger",
-      text: "Hapus",
+      text: t("fonts.delete"),
       attrs: { type: "button" },
     });
     removeBtn.addEventListener("click", async () => {
       const confirmed = await confirmDialog({
         title: t("fonts.deleteTitle"),
         message: `"${font.name}" akan dihapus dari perangkat ini. Teks yang sudah memakai font ini tidak berubah, tapi tampilannya kembali ke font bawaan sampai diunduh lagi.`,
-        confirmLabel: "Hapus",
+        confirmLabel: t("fonts.delete"),
       });
       if (!confirmed) return;
       await removeFont(font.id);
@@ -219,7 +143,7 @@ function createLibraryItem(font, { installed, onChange }) {
   } else {
     const downloadBtn = createEl("button", {
       className: "font-item__btn font-item__btn--primary",
-      text: "Unduh",
+      text: t("fonts.download"),
       attrs: { type: "button" },
     });
     downloadBtn.addEventListener("click", async () => {
@@ -260,19 +184,19 @@ function createUploadedItem(font, { onChange }) {
       attrs: { style: `font-family:"${font.family}"` },
     })
   );
-  info.appendChild(createEl("div", { className: "font-item__meta", text: "Aa Bb Cc — diunggah" }));
+  info.appendChild(createEl("div", { className: "font-item__meta", text: t("fonts.uploadedMeta") }));
 
   const actions = createEl("div", { className: "font-item__actions" });
   const removeBtn = createEl("button", {
     className: "font-item__btn font-item__btn--danger",
-    text: "Hapus",
+    text: t("fonts.delete"),
     attrs: { type: "button" },
   });
   removeBtn.addEventListener("click", async () => {
     const confirmed = await confirmDialog({
       title: t("fonts.deleteTitle"),
-      message: `"${font.name}" akan dihapus dari perangkat ini. Teks yang sudah memakai font ini tidak berubah, tapi tampilannya kembali ke font bawaan sampai diunggah lagi.`,
-      confirmLabel: "Hapus",
+      message: t("fonts.deleteConfirm", { name: font.name }),
+      confirmLabel: t("fonts.delete"),
     });
     if (!confirmed) return;
     await removeFont(font.id);
@@ -309,14 +233,13 @@ async function boot() {
     builtinList.appendChild(createBuiltinItem(font));
   }
 
-  // Jangan load SEMUA FontFace di awal — mahal. Meta dulu; faces di-load
-  // lazy per item yang terlihat (installed → ensure by family; library → preview).
+  // Muat ulang @font-face untuk font yang sudah pernah diunduh sebelumnya,
+  // supaya preview nama font di daftar tampil pakai fontnya sendiri.
+  await ensureInstalledFontsLoaded();
+
   async function load() {
     try {
-      const [library, installedRecords] = await Promise.all([
-        getFontLibrary(),
-        getInstalledFontsMeta(),
-      ]);
+      const [library, installedRecords] = await Promise.all([getFontLibrary(), getInstalledFonts()]);
       const installedIds = new Set(installedRecords.map((f) => f.id));
 
       clearChildren(libraryList);
@@ -366,12 +289,6 @@ async function boot() {
         for (const font of pageItems) {
           uploadedList.appendChild(createUploadedItem(font, { onChange: load }));
         }
-        // Load faces hanya untuk font di halaman ini (bukan semua).
-        ensureInstalledFontsLoaded({
-          families: pageItems.map((f) => f.family || f.id),
-          deferRest: true,
-          concurrency: 1,
-        }).catch(() => {});
         if (uploadedPagination) {
           renderPagination(uploadedPagination, uploadedPage, uploaded.length, (page) => {
             uploadedPage = page;

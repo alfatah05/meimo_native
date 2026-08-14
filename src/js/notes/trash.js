@@ -38,7 +38,7 @@ function createTrashCard(note, onChange) {
 
   const footer = createEl("div", { className: "note-card__footer" });
   footer.appendChild(
-    createEl("span", { text: `Dihapus ${formatRelativeDate(note.metadata.trashedAt)}` })
+    createEl("span", { text: t("trash.deletedAt", { date: formatRelativeDate(note.metadata.trashedAt) }) })
   );
 
   const actions = createEl("div", { className: "trash-card__actions" });
@@ -49,7 +49,7 @@ function createTrashCard(note, onChange) {
   });
   const deleteBtn = createEl("button", {
     className: "trash-card__btn trash-card__btn--danger",
-    text: "Hapus Permanen",
+    text: t("trash.deleteForever"),
     attrs: { type: "button" },
   });
 
@@ -62,8 +62,8 @@ function createTrashCard(note, onChange) {
   deleteBtn.addEventListener("click", async () => {
     const confirmed = await confirmDialog({
       title: t("note.deleteForeverTitle"),
-      message: `"${note.title || "Catatan tanpa judul"}" akan dihapus permanen dan tidak bisa dikembalikan.`,
-      confirmLabel: "Hapus Permanen",
+      message: t("note.deleteForeverBody"),
+      confirmLabel: t("trash.deleteForever"),
     });
     if (!confirmed) return;
     await permanentlyDeleteNote(note.id);

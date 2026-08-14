@@ -27,6 +27,7 @@ import {
 import { uuid } from "../utils/uuid.js";
 import { showToast } from "../../components/toast.js";
 import { getAiApiKey, getAiModel } from "../services/settings-service.js";
+import { t } from "../i18n/i18n.js";
 
 const AI_SHEET_ICON =
   '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z"/><path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"/></svg>';
@@ -420,7 +421,7 @@ async function callGemini(userPrompt, selectedText, insertMode = "replace") {
   const data = await res.json();
   const text =
     data?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-  if (!text.trim()) throw new Error("Gemini tidak mengembalikan teks");
+  if (!text.trim()) throw new Error(t("ai.sheet.emptyResponse"));
   return text.trim();
 }
 
@@ -516,7 +517,7 @@ async function typewriterInsert(editor, state, insertion, savedSel, cancelledRef
   }
   if (!sel) {
     console.error("[ai-sheet] tidak ada posisi kursor untuk insert");
-    showToast("Gagal menyisipkan: tidak ada kursor di editor", { tone: "danger" });
+    showToast(t("ai.sheet.insertFail"), { tone: "danger" });
     return;
   }
 
@@ -791,25 +792,25 @@ async function openAiSheet({ editor, state, savedSel, selectedText }) {
   if (!hasApiKey) {
     registerActiveSheet(doCancel);
     sheet.appendChild(
-      buildAiSheetHeader("Asisten AI", "Aktifkan kunci API untuk mulai menulis bersama AI")
+      buildAiSheetHeader(t("ai.sheet.inactiveTitle"), t("ai.sheet.inactiveSub"))
     );
     const inactive = createEl("div", { className: "ai-sheet__inactive" });
     inactive.appendChild(
       createEl("p", {
         className: "ai-sheet__inactive-msg",
-        text: "Asisten AI belum aktif, buka pengaturan untuk mengaktifkan",
+        text: t("ai.sheet.inactiveBody"),
       })
     );
     sheet.appendChild(inactive);
     const actionsOff = createEl("div", { className: "ai-sheet__actions image-sheet__actions" });
     const cancelBtnOff = createEl("button", {
       className: "image-sheet__btn image-sheet__btn--ghost",
-      text: "Batal",
+      text: t("ai.sheet.cancel"),
       attrs: { type: "button" },
     });
     const settingsBtn = createEl("button", {
       className: "image-sheet__btn image-sheet__btn--primary ai-sheet__generate-btn",
-      text: "Pengaturan",
+      text: t("ai.sheet.settings"),
       attrs: { type: "button" },
     });
     cancelBtnOff.addEventListener("click", doCancel);
@@ -843,17 +844,17 @@ async function openAiSheet({ editor, state, savedSel, selectedText }) {
   let liveSelectedText = selectedText || "";
   let insertMode = liveSelectedText.trim() ? "replace" : "replace";
 
-  const modeTitle = liveSelectedText.trim() ? "Edit teks terpilih" : "Sisipkan di kursor";
+  const modeTitle = liveSelectedText.trim() ? t("ai.sheet.editTitle") : t("ai.sheet.insertTitle");
   const modeSub = liveSelectedText.trim()
-    ? "AI akan mengubah seleksi sesuai instruksi kamu"
-    : "Tulis prompt — hasilnya masuk di posisi kursor";
+    ? t("ai.sheet.editSub")
+    : t("ai.sheet.insertSub");
   const headerEl = buildAiSheetHeader(modeTitle, modeSub);
   sheet.appendChild(headerEl);
 
   // Konteks + mode toggle (tampil hanya saat ada seleksi teks)
   const preview = createEl("div", { className: "ai-sheet__selection-preview" });
   preview.appendChild(
-    createEl("div", { className: "ai-sheet__selection-label", text: "Konteks" })
+    createEl("div", { className: "ai-sheet__selection-label", text: t("ai.sheet.context") })
   );
   const previewBody = createEl("div", { className: "ai-sheet__selection-body", text: "" });
   preview.appendChild(previewBody);
@@ -862,17 +863,17 @@ async function openAiSheet({ editor, state, savedSel, selectedText }) {
   const modeRow = createEl("div", { className: "ai-sheet__mode-row" });
   const modeToggle = createEl("div", {
     className: "ai-sheet__mode-toggle",
-    attrs: { role: "group", "aria-label": "Mode hasil AI" },
+    attrs: { role: "group", "aria-label": t("ai.sheet.modeAria") },
   });
   const btnReplace = createEl("button", {
     className: "ai-sheet__mode-btn is-active",
     attrs: { type: "button", "data-mode": "replace" },
-    text: "Mengganti",
+    text: t("ai.sheet.replace"),
   });
   const btnNew = createEl("button", {
     className: "ai-sheet__mode-btn",
     attrs: { type: "button", "data-mode": "new" },
-    text: "Buat baru",
+    text: t("ai.sheet.createNew"),
   });
   function setMode(mode) {
     insertMode = mode;
@@ -895,37 +896,37 @@ async function openAiSheet({ editor, state, savedSel, selectedText }) {
           ? liveSelectedText.slice(0, 280) + "…"
           : liveSelectedText;
       previewBody.textContent = shown;
-      if (headerEl.__titleEl) headerEl.__titleEl.textContent = "Edit teks terpilih";
+      if (headerEl.__titleEl) headerEl.__titleEl.textContent = t("ai.sheet.editTitle");
       if (headerEl.__subEl) {
-        headerEl.__subEl.textContent = "AI akan mengubah seleksi sesuai instruksi kamu";
+        headerEl.__subEl.textContent = t("ai.sheet.editSub");
       }
     } else {
-      if (headerEl.__titleEl) headerEl.__titleEl.textContent = "Sisipkan di kursor";
+      if (headerEl.__titleEl) headerEl.__titleEl.textContent = t("ai.sheet.insertTitle");
       if (headerEl.__subEl) {
-        headerEl.__subEl.textContent = "Tulis prompt — hasilnya masuk di posisi kursor";
+        headerEl.__subEl.textContent = t("ai.sheet.insertSub");
       }
       // Tanpa seleksi, mode sisip tidak relevan — reset ke replace default.
       setMode("replace");
     }
     if (textarea) {
       textarea.placeholder = hasCtx
-        ? "Mis. perbaiki ejaan, persingkat, ubah nada…"
-        : "Mis. tulis ringkasan rapat, ide outline…";
+        ? t("ai.sheet.placeholderEdit")
+        : t("ai.sheet.placeholderInsert");
     }
   }
 
   const promptSection = createEl("div", { className: "ai-sheet__section" });
   promptSection.appendChild(
-    createEl("div", { className: "ai-sheet__prompt-label", text: "Prompt" })
+    createEl("div", { className: "ai-sheet__prompt-label", text: t("ai.sheet.prompt") })
   );
   const textarea = createEl("textarea", {
     className: "ai-sheet__prompt",
     attrs: {
       rows: "5",
       placeholder: selectedText
-        ? "Mis. buat lebih formal, ringkas jadi 3 poin, atau ubah jadi quote di dalam scene mint…"
-        : "Mis. quote of the day di scene wave, list tips produktivitas, atau paragraf pembuka esai…",
-      "aria-label": "Prompt AI",
+        ? t("ai.sheet.placeholderEditLong")
+        : t("ai.sheet.placeholderInsertLong"),
+      "aria-label": t("ai.sheet.promptAria"),
     },
   });
   promptSection.appendChild(textarea);
@@ -991,12 +992,12 @@ async function openAiSheet({ editor, state, savedSel, selectedText }) {
   const cancelBtn = createEl("button", {
     className: "image-sheet__btn image-sheet__btn--ghost",
     attrs: { type: "button" },
-    text: "Batal",
+    text: t("ai.sheet.cancel"),
   });
   const generateBtn = createEl("button", {
     className: "image-sheet__btn image-sheet__btn--primary ai-sheet__generate-btn",
     attrs: { type: "button" },
-    html: '<span class="ai-sheet__btn-label">✦ Generate</span>',
+    html: '<span class="ai-sheet__btn-label">' + t("ai.sheet.generate") + '</span>',
   });
   actions.append(cancelBtn, generateBtn);
   sheet.appendChild(actions);
@@ -1086,7 +1087,7 @@ async function openAiSheet({ editor, state, savedSel, selectedText }) {
     if (isBusy || sheetClosed) return;
     const userPrompt = textarea.value.trim();
     if (!userPrompt) {
-      setStatus("Tulis prompt dulu.", "error");
+      setStatus(t("ai.sheet.needPrompt"), "error");
       textarea.focus();
       return;
     }
@@ -1154,11 +1155,11 @@ export function initAiSheet({ editor, state }) {
     className: "ai-fab",
     attrs: {
       type: "button",
-      "aria-label": "Tulis dengan AI",
-      title: "Tulis dengan AI",
+      "aria-label": t("ai.fab"),
+      title: t("ai.fab"),
     },
     html:
-      '<span class="ai-fab__label">Tulis dengan AI</span>' +
+      '<span class="ai-fab__label">' + t("ai.fab") + '</span>' +
       '<span class="ai-fab__icon" aria-hidden="true">' +
       '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z"/><path d="M5 15l.5 1.5L7 17l-1.5.5L5 19l-.5-1.5L3 17l1.5-.5L5 15z"/></svg>' +
       "</span>",
@@ -1230,10 +1231,6 @@ export function initAiSheet({ editor, state }) {
     return typeof navigator !== "undefined" ? navigator.onLine !== false : true;
   }
 
-  function isOutlineOpen() {
-    return !!document.querySelector(".outline-overlay.is-open");
-  }
-
   function updateFabVisibility() {
     if (document.body.classList.contains("is-ai-generating")) return;
     if (document.body.classList.contains("is-ai-typing")) {
@@ -1244,14 +1241,14 @@ export function initAiSheet({ editor, state }) {
       requestFabVisible(false);
       return;
     }
-    // Offline: sembunyikan FAB AI (butuh jaringan ke Gemini).
-    if (!isOnline()) {
+    // Sidebar outline terbuka: sembunyikan FAB AI (sidebar di atas FAB).
+    // Muncul lagi otomatis lewat focusin setelah user fokus editor lagi.
+    if (document.body.classList.contains("is-outline-open")) {
       requestFabVisible(false);
       return;
     }
-    // Sidebar outline terbuka: sembunyikan FAB AI (di belakang / tertutup
-    // backdrop). Muncul lagi saat outline tutup + user fokus editor.
-    if (isOutlineOpen()) {
+    // Offline: sembunyikan FAB AI (butuh jaringan ke Gemini).
+    if (!isOnline()) {
       requestFabVisible(false);
       return;
     }
@@ -1351,12 +1348,7 @@ export function initAiSheet({ editor, state }) {
     state.onChange(() => updateFabVisibility());
   }
   window.addEventListener("online", updateFabVisibility);
-  window.addEventListener("offline", () => {
-    // Langsung tutup — jangan tunggu state lain.
-    clearShowTimers();
-    setFabVisible(false);
-  });
-  document.addEventListener("meimo:outline-change", updateFabVisibility);
+  window.addEventListener("offline", updateFabVisibility);
 
   // Initial: biasanya belum ada fokus → sembunyi
   updateFabVisibility();

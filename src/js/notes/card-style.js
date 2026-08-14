@@ -20,7 +20,7 @@
  */
 
 import * as documentService from "../services/document-service.js";
-import { ensureInstalledFontsLoaded, extractFontFamiliesFromHtml, getAvailableFonts } from "../services/font-service.js";
+import { ensureInstalledFontsLoaded, getAvailableFonts } from "../services/font-service.js";
 import { createDefaultCardStyle } from "../db/schema.js";
 import { createEl, clearChildren, openPanel, closeTransientPickers } from "../utils/dom.js";
 import { createNoteCard } from "./note-card.js";
@@ -44,12 +44,19 @@ async function boot() {
   const edgeShapeList = document.getElementById("edgeShapeList");
   const bgColorList = document.getElementById("bgColorList");
   const bgColorCustom = document.getElementById("bgColorCustom");
+  const bgColorOpacity = document.getElementById("bgColorOpacity");
+  const bgColorOpacityValue = document.getElementById("bgColorOpacityValue");
   const bgImageInput = document.getElementById("bgImageInput");
   const bgImageUploadBtn = document.getElementById("bgImageUploadBtn");
   const bgImageRemoveBtn = document.getElementById("bgImageRemoveBtn");
-  const bgImageOpacityRow = document.getElementById("bgImageOpacityRow");
   const bgImageOpacity = document.getElementById("bgImageOpacity");
   const bgImageOpacityValue = document.getElementById("bgImageOpacityValue");
+  const bgTabs = document.querySelectorAll(".card-style-bg-tab");
+  const bgPanels = {
+    none: document.getElementById("bgPanelNone"),
+    color: document.getElementById("bgPanelColor"),
+    image: document.getElementById("bgPanelImage"),
+  };
   const hideSnippetToggle = document.getElementById("hideSnippetToggle");
   const resetBtn = document.getElementById("resetBtn");
   const saveBtn = document.getElementById("saveBtn");
@@ -58,60 +65,37 @@ async function boot() {
 
   const noteId = getNoteIdFromUrl();
 
-  // 1) Load note SEGERA (ringan).
-  // 2) JANGAN load semua font di sini — itu biang 15 detik saat banyak font.
-  // 3) Tunggu page transition SELESAI sebelum mutasi DOM berat (biar animasi
-  //    tidak patah karena main-thread keisi FontFace / clip-path).
-  const notePromise = noteId
-    ? documentService.loadNote(noteId)
-    : Promise.resolve(null);
+  // Mulai load data SEGERA (paralel dengan animasi page-in), tapi jangan
+  // mutasi DOM dulu. FontFace API + render swatch clip-path kompleks
+  // sebelumnya jalan di tengah animasi → naik-nya terasa lambat/berat.
+  const dataPromise = Promise.all([
+    noteId ? documentService.loadNote(noteId) : Promise.resolve(null),
+    ensureInstalledFontsLoaded(),
+  ]);
 
-  // Tunggu animasi page-in SELESAI total sebelum mutasi DOM berat.
-  // Card-style punya ~25 swatch clip-path — kalau di-render di tengah
-  // animasi, frame drop → terasa "patah-patah" (page lain tidak kena).
+  // Tunggu animasi page transition selesai (SPA: router.waitForPageTransition;
+  // multi-page / tanpa VT: langsung lanjut). Fallback timeout supaya tidak
+  // menggantung di browser aneh.
   try {
     if (window.__MEIMO_SPA__) {
       const { waitForPageTransition } = await import("../router.js");
       await Promise.race([
         waitForPageTransition(),
-        new Promise((r) => setTimeout(r, 500)),
+        new Promise((r) => setTimeout(r, 450)),
       ]);
-    } else {
-      // Cross-document View Transition (multi-page Capacitor):
-      // pagereveal.viewTransition.finished = animasi page-in benar-benar usai.
-      await new Promise((resolve) => {
-        let done = false;
-        const finish = () => {
-          if (done) return;
-          done = true;
-          resolve();
-        };
-        const onReveal = (e) => {
-          window.removeEventListener("pagereveal", onReveal);
-          if (e && e.viewTransition && e.viewTransition.finished) {
-            e.viewTransition.finished.then(finish).catch(finish);
-            // Safety: duration-page-in = 380ms + buffer
-            setTimeout(finish, 520);
-          } else {
-            // Tidak ada VT (atau browser lama) — tunggu durasi animasi CSS
-            setTimeout(finish, 420);
-          }
-        };
-        // pagereveal bisa sudah terpicu sebelum listener terpasang
-        if (window.__MEIMO_PAGE_REVEAL__) {
-          onReveal(window.__MEIMO_PAGE_REVEAL__);
-        } else {
-          window.addEventListener("pagereveal", onReveal);
-          // Fallback absolut
-          setTimeout(finish, 520);
-        }
-      });
+    } else if (typeof document.startViewTransition === "function") {
+      // Cross-document VT: berikan ruang satu frame + sedikit waktu agar
+      // animasi page-in (≈380ms) sempat berjalan di atas skeleton dulu.
+      await new Promise((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(r))
+      );
+      await new Promise((r) => setTimeout(r, 280));
     }
   } catch (_) {
     /* ignore — jangan gagalkan boot karena helper transisi */
   }
 
-  const note = await notePromise;
+  const [note] = await dataPromise;
   if (!note) {
     if (window.__MEIMO_SPA__) {
       import("../router.js").then((r) => {
@@ -124,24 +108,7 @@ async function boot() {
     return;
   }
 
-  // Meta list saja (tanpa bytes) — cepat, cukup untuk dropdown.
   const fonts = await getAvailableFonts();
-
-  // Prioritas FontFace: title font draft + family yang dipakai di note.
-  // Sisanya di background idle — jangan blok first paint.
-  const draftTitleFont =
-    (note.metadata && note.metadata.cardStyle && note.metadata.cardStyle.titleFont) || null;
-  const used = extractFontFamiliesFromHtml(
-    `${note.title || ""} ${note.body || note.content || note.html || ""}`
-  );
-  const priorityFamilies = [...new Set([draftTitleFont, ...used].filter(Boolean))];
-  // Fire-and-forget setelah UI siap; await singkat max 1 family biar preview
-  // title font tidak fallback ke sistem.
-  const priorityFontPromise = ensureInstalledFontsLoaded({
-    families: priorityFamilies,
-    deferRest: true,
-    concurrency: 1,
-  });
 
   const originalCardStyle = note.metadata.cardStyle
     ? { ...createDefaultCardStyle(), ...note.metadata.cardStyle }
@@ -159,6 +126,146 @@ async function boot() {
   let pendingBytesPromise = null;
   let pendingPreviewUrl = null;
   let removeExistingImage = false;
+
+  /* ---- Background mode tabs (none | color | image) ---- */
+  let bgMode = "none"; // none | color | image
+  let colorRgb = { r: 74, g: 85, b: 199 };
+  let colorAlpha = 1;
+
+  function parseCssColor(value) {
+    if (!value || typeof value !== "string") return null;
+    const v = value.trim();
+    if (/^var\(/.test(v)) return null;
+    const hex = v.match(/^#([0-9A-Fa-f]{6})$/i);
+    if (hex) {
+      const n = parseInt(hex[1], 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
+    }
+    const rgb = v.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
+    if (rgb) {
+      return {
+        r: Math.min(255, +rgb[1]),
+        g: Math.min(255, +rgb[2]),
+        b: Math.min(255, +rgb[3]),
+        a: rgb[4] !== undefined ? Math.max(0, Math.min(1, +rgb[4])) : 1,
+      };
+    }
+    try {
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
+      probe.style.backgroundColor = v;
+      document.body.appendChild(probe);
+      const computed = getComputedStyle(probe).backgroundColor;
+      document.body.removeChild(probe);
+      const m = computed && computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
+      if (!m) return null;
+      return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== undefined ? +m[4] : 1 };
+    } catch {
+      return null;
+    }
+  }
+
+  function resolveAnyColor(value) {
+    const direct = parseCssColor(value);
+    if (direct) return direct;
+    if (!value) return null;
+    try {
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px;";
+      probe.style.backgroundColor = value;
+      document.body.appendChild(probe);
+      const computed = getComputedStyle(probe).backgroundColor;
+      document.body.removeChild(probe);
+      const m = computed && computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
+      if (!m) return null;
+      return { r: +m[1], g: +m[2], b: +m[3], a: m[4] !== undefined ? +m[4] : 1 };
+    } catch {
+      return null;
+    }
+  }
+
+  function toHex({ r, g, b }) {
+    const h = (n) => n.toString(16).padStart(2, "0");
+    return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
+  }
+
+  function formatCssColor({ r, g, b, a }) {
+    if (a >= 0.995) return toHex({ r, g, b });
+    const aStr = Math.round(a * 100) / 100;
+    return `rgba(${r}, ${g}, ${b}, ${aStr})`;
+  }
+
+  function detectBgMode() {
+    const hasImage = !!pendingPreviewUrl || (!removeExistingImage && !!draft.bgImageAssetId);
+    if (hasImage) return "image";
+    if (draft.bgColor) return "color";
+    return "none";
+  }
+
+  function setBgMode(mode, { applyDefaults = true } = {}) {
+    bgMode = mode;
+    for (const tab of bgTabs) {
+      const on = tab.dataset.tab === mode;
+      tab.classList.toggle("is-active", on);
+      tab.setAttribute("aria-selected", String(on));
+    }
+    for (const [key, panel] of Object.entries(bgPanels)) {
+      if (!panel) continue;
+      const on = key === mode;
+      panel.classList.toggle("is-active", on);
+      panel.hidden = !on;
+    }
+
+    if (!applyDefaults) return;
+
+    if (mode === "none") {
+      draft.bgColor = null;
+      if (pendingPreviewUrl) {
+        URL.revokeObjectURL(pendingPreviewUrl);
+        pendingPreviewUrl = null;
+        pendingFile = null;
+        pendingMimeType = null;
+        pendingBytesPromise = null;
+      }
+      removeExistingImage = !!originalCardStyle.bgImageAssetId;
+      if (bgImageInput) bgImageInput.value = "";
+    } else if (mode === "color") {
+      // Hapus gambar bila pindah ke color
+      if (pendingPreviewUrl) {
+        URL.revokeObjectURL(pendingPreviewUrl);
+        pendingPreviewUrl = null;
+        pendingFile = null;
+        pendingMimeType = null;
+        pendingBytesPromise = null;
+      }
+      removeExistingImage = true;
+      if (bgImageInput) bgImageInput.value = "";
+      if (!draft.bgColor) {
+        draft.bgColor = formatCssColor({ ...colorRgb, a: colorAlpha });
+      } else {
+        const p = resolveAnyColor(draft.bgColor);
+        if (p) {
+          colorRgb = { r: p.r, g: p.g, b: p.b };
+          colorAlpha = p.a;
+        }
+      }
+      if (bgColorCustom) bgColorCustom.value = toHex(colorRgb);
+      if (bgColorOpacity) {
+        bgColorOpacity.value = String(colorAlpha);
+        bgColorOpacityValue.textContent = `${Math.round(colorAlpha * 100)}%`;
+      }
+    } else if (mode === "image") {
+      // Hapus warna solid
+      draft.bgColor = null;
+      removeExistingImage = false;
+      if (bgImageOpacity) {
+        const op = draft.bgImageOpacity != null ? draft.bgImageOpacity : 1;
+        bgImageOpacity.value = String(op);
+        bgImageOpacityValue.textContent = `${Math.round(op * 100)}%`;
+      }
+    }
+  }
+
 
   function applyPreviewBackground(card) {
     if (!card || !pendingPreviewUrl) return;
@@ -215,11 +322,11 @@ async function boot() {
       });
     }
 
-    bgImageRemoveBtn.hidden = !hasImage;
-    bgImageOpacityRow.hidden = !hasImage;
-    if (hasImage) {
-      bgImageOpacity.value = draft.bgImageOpacity;
-      bgImageOpacityValue.textContent = `${Math.round(draft.bgImageOpacity * 100)}%`;
+    if (bgImageRemoveBtn) bgImageRemoveBtn.hidden = !hasImage;
+    if (hasImage && bgImageOpacity) {
+      const op = draft.bgImageOpacity != null ? draft.bgImageOpacity : 1;
+      bgImageOpacity.value = String(op);
+      if (bgImageOpacityValue) bgImageOpacityValue.textContent = `${Math.round(op * 100)}%`;
     }
   }
 
@@ -299,20 +406,43 @@ async function boot() {
     }
   }
 
-  /* ---- Warna Latar ---- */
+  /* ---- Warna Latar (tab color) ---- */
+  function colorMatchesActive(presetHex) {
+    if (!presetHex && !draft.bgColor) return bgMode === "none";
+    if (!presetHex) return false;
+    if (draft.bgColor === presetHex) return true;
+    // Match hex/rgba against resolved preset
+    const a = resolveAnyColor(draft.bgColor);
+    const b = resolveAnyColor(presetHex);
+    if (!a || !b) return false;
+    return a.r === b.r && a.g === b.g && a.b === b.b && Math.abs(a.a - b.a) < 0.02;
+  }
+
   function renderBgColorList() {
+    if (!bgColorList) return;
     clearChildren(bgColorList);
     for (const preset of BG_COLOR_PRESETS) {
+      // Skip "Default"/null preset — digantikan tab None
+      if (!preset.hex) continue;
       const swatch = createEl("button", {
         className:
           "card-style-color-swatch" +
-          (!preset.hex ? " card-style-color-swatch--none" : "") +
-          (draft.bgColor === preset.hex ? " is-active" : ""),
+          (bgMode === "color" && colorMatchesActive(preset.hex) ? " is-active" : ""),
         attrs: { type: "button", title: preset.label, "aria-label": preset.label },
       });
-      if (preset.hex) swatch.style.backgroundColor = preset.hex;
+      swatch.style.backgroundColor = preset.hex;
       swatch.addEventListener("click", () => {
         draft.bgColor = preset.hex;
+        const resolved = resolveAnyColor(preset.hex);
+        if (resolved) {
+          colorRgb = { r: resolved.r, g: resolved.g, b: resolved.b };
+          colorAlpha = resolved.a;
+          if (bgColorCustom) bgColorCustom.value = toHex(colorRgb);
+          if (bgColorOpacity) {
+            bgColorOpacity.value = String(colorAlpha);
+            bgColorOpacityValue.textContent = `${Math.round(colorAlpha * 100)}%`;
+          }
+        }
         renderBgColorList();
         renderPreview();
       });
@@ -320,58 +450,93 @@ async function boot() {
     }
   }
 
-  bgColorCustom.addEventListener("input", () => {
-    draft.bgColor = bgColorCustom.value;
-    renderBgColorList();
-    renderPreview();
-  });
+  if (bgColorCustom) {
+    bgColorCustom.addEventListener("input", () => {
+      const p = parseCssColor(bgColorCustom.value);
+      if (!p) return;
+      colorRgb = { r: p.r, g: p.g, b: p.b };
+      draft.bgColor = formatCssColor({ ...colorRgb, a: colorAlpha });
+      renderBgColorList();
+      renderPreview();
+    });
+  }
 
-  /* ---- Gambar Latar ---- */
-  bgImageUploadBtn.addEventListener("click", () => bgImageInput.click());
-  bgImageInput.addEventListener("change", async () => {
-    const file = bgImageInput.files && bgImageInput.files[0];
-    if (!file) return;
-    if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
-    pendingFile = file;
-    pendingMimeType = file.type || "image/png";
-    // Baca ArrayBuffer sekarang juga (bukan nanti saat Simpan ditekan) —
-    // izin baca file dari photo picker di mobile bersifat singkat.
-    pendingBytesPromise = file.arrayBuffer();
-    const objectUrl = URL.createObjectURL(file);
-    // Decode dulu supaya background CSS tidak "kosong" di frame pertama
-    // (sering terjadi di cold start PWA / upload pertama).
-    try {
-      await new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-        img.src = objectUrl;
-      });
-    } catch (_) {}
-    pendingPreviewUrl = objectUrl;
-    removeExistingImage = false;
-    renderPreview();
-  });
+  if (bgColorOpacity) {
+    bgColorOpacity.addEventListener("input", () => {
+      colorAlpha = Math.max(0, Math.min(1, parseFloat(bgColorOpacity.value) || 0));
+      bgColorOpacityValue.textContent = `${Math.round(colorAlpha * 100)}%`;
+      // Ambil RGB dari warna aktif (preset var / custom)
+      const resolved = resolveAnyColor(draft.bgColor) || colorRgb;
+      colorRgb = { r: resolved.r, g: resolved.g, b: resolved.b };
+      draft.bgColor = formatCssColor({ ...colorRgb, a: colorAlpha });
+      renderBgColorList();
+      renderPreview();
+    });
+  }
 
-  bgImageRemoveBtn.addEventListener("click", () => {
-    if (pendingPreviewUrl) {
-      URL.revokeObjectURL(pendingPreviewUrl);
-      pendingPreviewUrl = null;
-      pendingFile = null;
-      pendingMimeType = null;
-      pendingBytesPromise = null;
-    }
-    removeExistingImage = true;
-    bgImageInput.value = "";
-    renderPreview();
-  });
+  /* ---- Tab bar ---- */
+  for (const tab of bgTabs) {
+    tab.addEventListener("click", () => {
+      const mode = tab.dataset.tab;
+      if (!mode || mode === bgMode) return;
+      setBgMode(mode, { applyDefaults: true });
+      renderBgColorList();
+      renderPreview();
+    });
+  }
 
-  bgImageOpacity.addEventListener("input", () => {
-    draft.bgImageOpacity = parseFloat(bgImageOpacity.value);
-    bgImageOpacityValue.textContent = `${Math.round(draft.bgImageOpacity * 100)}%`;
-    const card = previewSlot.firstElementChild;
-    if (card) card.style.setProperty("--card-bg-opacity", draft.bgImageOpacity);
-  });
+  /* ---- Gambar Latar (tab image) ---- */
+  if (bgImageUploadBtn) bgImageUploadBtn.addEventListener("click", () => bgImageInput.click());
+  if (bgImageInput) {
+    bgImageInput.addEventListener("change", async () => {
+      const file = bgImageInput.files && bgImageInput.files[0];
+      if (!file) return;
+      if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl);
+      pendingFile = file;
+      pendingMimeType = file.type || "image/png";
+      pendingBytesPromise = file.arrayBuffer();
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = objectUrl;
+        });
+      } catch (_) {}
+      pendingPreviewUrl = objectUrl;
+      removeExistingImage = false;
+      draft.bgColor = null;
+      if (bgMode !== "image") setBgMode("image", { applyDefaults: false });
+      renderPreview();
+    });
+  }
+
+  if (bgImageRemoveBtn) {
+    bgImageRemoveBtn.addEventListener("click", () => {
+      if (pendingPreviewUrl) {
+        URL.revokeObjectURL(pendingPreviewUrl);
+        pendingPreviewUrl = null;
+        pendingFile = null;
+        pendingMimeType = null;
+        pendingBytesPromise = null;
+      }
+      removeExistingImage = true;
+      if (bgImageInput) bgImageInput.value = "";
+      setBgMode("none", { applyDefaults: true });
+      renderBgColorList();
+      renderPreview();
+    });
+  }
+
+  if (bgImageOpacity) {
+    bgImageOpacity.addEventListener("input", () => {
+      draft.bgImageOpacity = parseFloat(bgImageOpacity.value);
+      bgImageOpacityValue.textContent = `${Math.round(draft.bgImageOpacity * 100)}%`;
+      const card = previewSlot.firstElementChild;
+      if (card) card.style.setProperty("--card-bg-opacity", draft.bgImageOpacity);
+    });
+  }
 
   /* ---- Setel Ulang & Simpan ---- */
   if (hideSnippetToggle) {
@@ -390,8 +555,16 @@ async function boot() {
     pendingBytesPromise = null;
     pendingPreviewUrl = null;
     removeExistingImage = !!originalCardStyle.bgImageAssetId;
-    bgImageInput.value = "";
-    bgColorCustom.value = "#4A55C7";
+    if (bgImageInput) bgImageInput.value = "";
+    colorRgb = { r: 74, g: 85, b: 199 };
+    colorAlpha = 1;
+    if (bgColorCustom) bgColorCustom.value = "#4A55C7";
+    if (bgColorOpacity) {
+      bgColorOpacity.value = "1";
+      bgColorOpacityValue.textContent = "100%";
+    }
+    setBgMode("none", { applyDefaults: false });
+    draft.bgColor = null;
     renderFontSelect();
     renderEdgeShapeList();
     renderBgColorList();
@@ -438,32 +611,30 @@ async function boot() {
   });
 
   renderFontSelect();
-  renderBgColorList();
-  if (draft.bgColor) bgColorCustom.value = draft.bgColor;
-
-  // Preview dulu (1 kartu) — ringan. Edge shapes (25 clip-path) ditunda
-  // 1–2 frame supaya tidak tabrakan dengan sisa compositing page-in.
-  renderPreview();
-  if (skeleton) skeleton.hidden = true;
-
-  const scheduleEdge = (fn) => {
-    if (typeof requestIdleCallback === "function") {
-      requestIdleCallback(() => fn(), { timeout: 200 });
-    } else {
-      requestAnimationFrame(() => requestAnimationFrame(fn));
+  renderEdgeShapeList();
+  // Init mode dari draft tersimpan
+  const initialMode = detectBgMode();
+  if (draft.bgColor) {
+    const p = resolveAnyColor(draft.bgColor);
+    if (p) {
+      colorRgb = { r: p.r, g: p.g, b: p.b };
+      colorAlpha = p.a;
     }
-  };
-  scheduleEdge(() => {
-    renderEdgeShapeList();
-  });
+    if (bgColorCustom) bgColorCustom.value = toHex(colorRgb);
+    if (bgColorOpacity) {
+      bgColorOpacity.value = String(colorAlpha);
+      bgColorOpacityValue.textContent = `${Math.round(colorAlpha * 100)}%`;
+    }
+  }
+  setBgMode(initialMode, { applyDefaults: false });
+  renderBgColorList();
+  renderPreview();
 
-  // Priority font (max ~2s) lalu re-render preview bila family berubah.
-  Promise.race([
-    priorityFontPromise,
-    new Promise((r) => setTimeout(r, 2000)),
-  ]).then(() => {
-    renderPreview();
-  }).catch(() => {});
+  // Skeleton cuma perlu tampil sekali di load pertama (biar tidak "kedip
+  // putih" pas navigasi ke halaman ini) — begitu semua section sudah
+  // dirender dengan data asli, sembunyikan permanen (lihat pola yang sama
+  // di fonts/font-manager.js).
+  if (skeleton) skeleton.hidden = true;
 }
 
 /** Init untuk SPA / multi-page. */

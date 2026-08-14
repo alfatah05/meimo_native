@@ -30,7 +30,7 @@ import {
 } from "./editor/voice-record-sheet.js";
 import { initToolbar } from "./toolbar/toolbar.js";
 import * as documentService from "./services/document-service.js";
-import { ensureInstalledFontsLoaded, extractFontFamiliesFromHtml } from "./services/font-service.js";
+import { ensureInstalledFontsLoaded } from "./services/font-service.js";
 import * as audioPlayerService from "./services/audio-player-service.js";
 import { hasActiveSheet, closeActiveSheet } from "./toolbar/active-sheet.js";
 import { debounce } from "./utils/debounce.js";
@@ -85,7 +85,7 @@ function setNoteIdInUrl(id) {
 // sekali. Fix: skeleton dijamin tampil minimal MIN_SKELETON_VISIBLE_MS sejak
 // boot() mulai, baru boleh dilepas — kalau load-nya sudah lebih lambat dari
 // itu (mis. device lambat/font besar), tidak ada tambahan delay sama sekali.
-const MIN_SKELETON_VISIBLE_MS = 80;
+const MIN_SKELETON_VISIBLE_MS = 220;
 
 let __editorBooted = false;
 /** Listener pagehide/beforeunload/visibility — sekali saja per document. */
@@ -107,27 +107,21 @@ async function boot() {
   const bindGlobalListeners = !__editorGlobalListenersBound;
   if (bindGlobalListeners) __editorGlobalListenersBound = true;
 
+  // Muat lebih dulu @font-face untuk font kustom yang sudah pernah diunduh
+  // (lihat font-service.js) — supaya isi note yang sudah memakai Font
+  // Family kustom langsung tampil dengan font yang benar, bukan fallback.
+  await ensureInstalledFontsLoaded();
+
   // Tangkap flag voice SEBELUM setNoteIdInUrl menghapus query string.
   const autoOpenVoice = shouldAutoOpenVoiceRecord();
 
-  // Muat note DULU, baru font yang dipakai note — sisanya background.
-  // Sebelumnya ensureInstalledFontsLoaded() memuat SEMUA font dulu →
-  // editor terasa lambat.
+  // Muat note yang sudah ada (?id=...) atau buat note baru (mis. dari tombol "+").
   const existingId = getNoteIdFromUrl();
   let doc = existingId ? await documentService.loadNote(existingId) : null;
   if (!doc) {
     doc = await documentService.createNote({ title: "" });
     setNoteIdInUrl(doc.id);
   }
-
-  const usedFamilies = extractFontFamiliesFromHtml(
-    `${doc.title || ""} ${doc.body || doc.content || doc.html || ""}`
-  );
-  await ensureInstalledFontsLoaded({
-    families: usedFamilies,
-    deferRest: true,
-    concurrency: 2,
-  });
   // Bersihkan query voice dari URL (baik note baru maupun existing).
   if (autoOpenVoice) clearVoiceQueryFromUrl();
 

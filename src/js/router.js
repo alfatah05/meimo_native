@@ -25,37 +25,6 @@ const STATIC_ROUTES = {
   "/fitur-ai.html": "fitur-ai",
 };
 
-/**
- * Halaman multi-page (bukan SPA shell). Di server Apache, .htaccess
- * rewrite /about → about.html. Di Capacitor WebView TIDAK ada rewrite,
- * jadi harus load file .html secara eksplisit.
- */
-const MULTI_PAGE_FILES = {
-  "/about": "/about.html",
-  "/about.html": "/about.html",
-  "/privacy-policy": "/privacy-policy.html",
-  "/privacy-policy.html": "/privacy-policy.html",
-  "/download": "/download.html",
-  "/download.html": "/download.html",
-};
-
-/** Normalize path: buang trailing slash */
-function normalizePath(pathname) {
-  return (pathname || "/").replace(/\/+$/, "") || "/";
-}
-
-/** Map pretty URL → file nyata untuk full-page load (Capacitor / static). */
-function resolveMultiPageFile(pathname) {
-  const p = normalizePath(pathname);
-  return MULTI_PAGE_FILES[p] || null;
-}
-
-/** Apakah path ini "home" SPA yang di static hosting = index.html */
-function isSpaHomePath(pathname) {
-  const p = normalizePath(pathname);
-  return p === "/" || p === "/library" || p === "/index.html";
-}
-
 let currentRoute = null;
 let onRouteCallback = null;
 let started = false;
@@ -162,12 +131,8 @@ export function navigate(to, { replace = false } = {}) {
   const route = parseRoute(url.pathname);
 
   if (!route) {
-    const file = resolveMultiPageFile(url.pathname);
-    const href = file
-      ? file + (url.search || "") + (url.hash || "")
-      : url.href;
-    if (replace) window.location.replace(href);
-    else window.location.assign(href);
+    if (replace) window.location.replace(url.href);
+    else window.location.assign(url.href);
     return;
   }
 
@@ -194,17 +159,7 @@ export function navigate(to, { replace = false } = {}) {
     }
   };
 
-  const vt = runWithViewTransition(apply);
-  // Tandai settle setelah VT — dipakai card-style untuk reveal fixed bar.
-  if (route.name === "card-style") {
-    if (vt && vt.finished) {
-      vt.finished.catch(() => {}).finally(() => {
-        document.documentElement.classList.add("is-vt-settled");
-      });
-    } else {
-      document.documentElement.classList.add("is-vt-settled");
-    }
-  }
+  runWithViewTransition(apply);
 }
 
 export function getRoute() {
@@ -247,27 +202,9 @@ export function init(opts = {}) {
       if (url.origin !== window.location.origin) return;
 
       const route = parseRoute(url.pathname);
-      if (!route) {
-        // Multi-page (about, privacy, download): load file .html
-        // supaya jalan di Capacitor (tanpa .htaccess rewrite).
-        const file = resolveMultiPageFile(url.pathname);
-        if (file) {
-          e.preventDefault();
-          window.location.assign(file + (url.search || "") + (url.hash || ""));
-        }
-        return;
-      }
+      if (!route) return;
 
       e.preventDefault();
-      // Kalau kita sedang di dokumen multi-page (bukan SPA shell),
-      // pindah ke index.html dulu lalu biarkan SPA handle route.
-      // Deteksi kasar: tidak ada window.__MEIMO_SPA__
-      if (!window.__MEIMO_SPA__) {
-        const targetPath = pathFor(route) + (url.search || "") + (url.hash || "");
-        // Home → index.html; rute SPA lain juga lewat index (view di dalam SPA)
-        window.location.assign("/index.html#" + encodeURIComponent(targetPath));
-        return;
-      }
       navigate(url, { replace: false });
     },
     true

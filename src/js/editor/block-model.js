@@ -253,6 +253,16 @@ export const IMAGE_DEFAULTS = Object.freeze({
   // kelihatan efeknya karena gambarnya sendiri memang tidak punya area
   // tembus pandang.
   transparentBg: false,
+  // Status toggle "Kunci Rasio" di image-sheet.js — DISIMPAN per-block (bukan
+  // cuma state sementara sheet) supaya kalau user membuka lagi sheet gambar
+  // yang sama nanti, preferensinya masih diingat alih-alih selalu balik ke
+  // "off". Murni metadata untuk UX sheet; tidak memengaruhi tampilan gambar
+  // itu sendiri (makanya tidak disentuh oleh serializer.js).
+  lockAspect: false,
+  imageOffsetX: 0,
+  imageOffsetY: 0,
+  imageScale: 1,
+  imageRotate: 0,
 });
 
 /**
@@ -279,6 +289,11 @@ export function createImageBlock({
   wrap = IMAGE_DEFAULTS.wrap,
   clipShape = IMAGE_DEFAULTS.clipShape,
   transparentBg = IMAGE_DEFAULTS.transparentBg,
+  lockAspect = IMAGE_DEFAULTS.lockAspect,
+  imageOffsetX = IMAGE_DEFAULTS.imageOffsetX,
+  imageOffsetY = IMAGE_DEFAULTS.imageOffsetY,
+  imageScale = IMAGE_DEFAULTS.imageScale,
+  imageRotate = IMAGE_DEFAULTS.imageRotate,
   sceneId = null,
 } = {}) {
   return {
@@ -296,6 +311,11 @@ export function createImageBlock({
     wrap: !!wrap,
     clipShape: clipShape || IMAGE_DEFAULTS.clipShape,
     transparentBg: !!transparentBg,
+    lockAspect: !!lockAspect,
+    imageOffsetX: Number.isFinite(imageOffsetX) ? imageOffsetX : 0,
+    imageOffsetY: Number.isFinite(imageOffsetY) ? imageOffsetY : 0,
+    imageScale: Number.isFinite(imageScale) ? imageScale : 1,
+    imageRotate: Number.isFinite(imageRotate) ? imageRotate : 0,
     sceneId: sceneId || null,
   };
 }
@@ -609,8 +629,21 @@ export function cloneBlock(block) {
     cloned.imageWidth = block.imageWidth;
     cloned.imageHeight = block.imageHeight;
     cloned.borderRadius = block.borderRadius;
+    cloned.imageOffsetX = block.imageOffsetX ?? 0;
+    cloned.imageOffsetY = block.imageOffsetY ?? 0;
+    cloned.imageScale = block.imageScale ?? 1;
+    cloned.imageRotate = block.imageRotate ?? 0;
     cloned.wrap = !!block.wrap;
     cloned.clipShape = block.clipShape || "none";
+    // FIX: transparentBg & lockAspect sebelumnya TIDAK ikut di-clone di sini
+    // (whitelist ini ketinggalan menambahkannya) — akibatnya operasi apa pun
+    // yang lewat cloneBlock() alih-alih Object.assign(patch) langsung (mis.
+    // duplicate block, copy-paste, split/merge block) diam-diam membuang
+    // kedua nilai ini balik ke default. updateImageBlock() dari image-sheet.js
+    // sendiri aman (clone dulu baru Object.assign(patch) di atasnya), tapi
+    // jalur lain tetap butuh field ini ikut ter-preserve.
+    cloned.transparentBg = !!block.transparentBg;
+    cloned.lockAspect = !!block.lockAspect;
   }
   return cloned;
 }
