@@ -1,0 +1,78 @@
+name: Deploy Web (FTP)
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ftp
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Upload PWA to FTP
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare deploy directory
+        run: |
+          set -euo pipefail
+          rm -rf .deploy
+          mkdir -p .deploy
+
+          for f in \
+            index.html about.html arsip.html cadangkan.html card-style.html \
+            download.html editor.html fitur-ai.html font-manager.html \
+            privacy-policy.html settings.html trash.html \
+            manifest.json service-worker.js
+          do
+            if [ -f "$f" ]; then cp -a "$f" .deploy/; fi
+          done
+
+          # Apache rewrite rules
+          if [ -f htaccess ]; then
+            cp htaccess .deploy/.htaccess
+          elif [ -f .htaccess ]; then
+            cp .htaccess .deploy/.htaccess
+          fi
+
+          cp -a src .deploy/src
+          cp -a assets .deploy/assets
+
+          echo "Deploy tree (depth 2):"
+          find .deploy -maxdepth 2 | head -50
+          du -sh .deploy
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Opsional: set secret FTP_PORT (default 21), FTP_SERVER_DIR (default ./),
+          # FTP_PROTOCOL = ftp | ftps | ftps-legacy (default ftp)
+          port: ${{ secrets.FTP_PORT != '' && secrets.FTP_PORT || 21 }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR != '' && secrets.FTP_SERVER_DIR || './' }}
+          protocol: ${{ secrets.FTP_PROTOCOL != '' && secrets.FTP_PROTOCOL || 'ftp' }}
+          local-dir: ./.deploy/
+          timeout: 60000
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.DS_Store
+            **/*.md
+            **/package.json
+            **/package-lock.json
+            **/capacitor.config.*
+            **/android/**
+            **/www/**
+            **/scripts/**
+            **/resources/**
+            **/android-patches/**
