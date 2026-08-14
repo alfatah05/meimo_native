@@ -74,3 +74,75 @@ sinkron):
   tanpa cache version naik, browser user bisa tetap kelihatan "berhasil"
   padahal masih menjalankan file lama dari cache, bukan file yang baru
   diperbaiki.
+
+---
+
+## 3. Ruang lingkup perubahan: Web vs Native vs Global
+
+Project ini **satu codebase** untuk dua target:
+
+| Target | Cara jalan | Ciri |
+|--------|------------|------|
+| **Web / PWA** | Serve folder root (HTTP + `.htaccess`) | IndexedDB, `<a download>`, URL cantik via rewrite |
+| **Native (Capacitor)** | WebView Android (`www/` + plugins) | Filesystem, plugin native, **tanpa** rewrite URL |
+
+Kode base web dan jalur native dipisah secara eksplisit (lihat
+`README_NATIVE.md`). Saat user minta perubahan, AI **WAJIB** patuhi ruang
+lingkup yang diminta:
+
+### 3.1 Update **global** (berlaku web + native)
+
+Contoh: fitur baru di editor, bug UI yang sama di kedua platform, refactor
+komponen bersama, i18n, tema, dsb.
+
+- Ubah kode shared (`src/js/**` yang bukan modul native-only, HTML, CSS).
+- Pastikan perilaku tetap benar di **web dan native**.
+- Kalau ada cabang `isNative()` / dual-path (IDB vs Filesystem, download,
+  dll.), **kedua cabang** harus ikut diperbarui atau tetap konsisten.
+- Jangan sengaja membiarkan salah satu target rusak.
+
+### 3.2 Update **web saja**
+
+Contoh: user bilang “hanya web”, “versi web”, “PWA saja”, atau masalah
+yang hanya muncul di browser (service worker, `.htaccess`, install
+prompt, dsb.).
+
+- Hanya ubah bagian yang mempengaruhi web.
+- **Jangan** mengubah perilaku native. Hindari edit yang memaksa jalur
+  native berubah, kecuali memang tidak terhindarkan dan sudah
+  dikonfirmasi aman (guard dengan `isNative()` / `!isNative()`).
+- File native-only (`src/js/native/**`, `android-patches/**`,
+  `capacitor.config.json`, plugin Java, `scripts/prepare-www.sh` yang
+  khusus native) **jangan disentuh** kecuali user minta.
+
+### 3.3 Update **native saja**
+
+Contoh: user bilang “hanya native”, “Capacitor”, “Android”, “build
+native”, atau bug yang hanya muncul di WebView/APK (back button, StatusBar,
+path tanpa rewrite, FileSaver, permission, dsb.).
+
+- Hanya ubah bagian yang mempengaruhi native.
+- **Jangan** mengubah perilaku web. Semua penyesuaian native harus di
+  balik guard `isNative()` / `Capacitor.isNativePlatform()`, atau di file
+  yang hanya di-load native (`src/js/native/**`, plugin Android, patch
+  script).
+- HTML/CSS/JS shared boleh disentuh **hanya** jika perubahan di-guard
+  native-only (web tetap jalur lama).
+- Setelah ubah, ingat user biasanya perlu `npm run prepare:www` +
+  `npm run cap:sync` — sebutkan di instruksi serah terima.
+
+### 3.4 Cara membedakan & default
+
+1. **Baca permintaan user dulu.** Kalau disebut “native”, “Capacitor”,
+   “Android”, “APK” → default **native saja**. Kalau “web”, “PWA”,
+   “browser” → default **web saja**. Kalau tidak disebut / fitur umum →
+   default **global**.
+2. Kalau ragu, tanya user singkat: global / web saja / native saja?
+3. Di ringkasan hasil kerja, **sebutkan ruang lingkup** yang dipakai
+   (global / web-only / native-only) supaya user tahu apa yang berubah.
+4. Jangan “bocor” perubahan native ke web (mis. hardcode `.html` di semua
+   link tanpa guard) atau sebaliknya (asumsi rewrite `.htaccess` di
+   native).
+
+**Ringkas:** global = kedua target; web saja = web tidak rusak native;
+native saja = native tidak rusak web.

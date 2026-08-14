@@ -97,11 +97,6 @@
 <script>
 (function () {
   try {
-    // Capacitor / static: multi-page may return via /index.html#/library
-    if (location.hash && location.hash.charAt(1) === "/") {
-      var target = decodeURIComponent(location.hash.slice(1));
-      history.replaceState(null, "", target || "/library");
-    }
     var path = location.pathname.replace(/\/+$/, "") || "/";
     var map = {
       "/editor": "editor",

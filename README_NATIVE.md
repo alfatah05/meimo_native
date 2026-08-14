@@ -69,32 +69,3 @@ npm run assets
 ## GitHub Actions
 
 Workflow `.github/workflows/android.yml` build APK debug saat push ke main/master.
-
-
-## Deploy Web ke FTP (GitHub Actions)
-
-Workflow: `.github/workflows/deploy-ftp.yml`  
-Trigger: push ke `main`/`master` atau **Run workflow** manual.
-
-### Secrets yang perlu diisi (Settings → Secrets and variables → Actions)
-
-| Secret | Wajib | Keterangan |
-|--------|-------|------------|
-| `FTP_SERVER` | ✅ | Host FTP, mis. `ftp.domain.com` atau IP |
-| `FTP_USERNAME` | ✅ | Username FTP |
-| `FTP_PASSWORD` | ✅ | Password FTP |
-| `FTP_SERVER_DIR` | opsional | Folder remote, default `./` (mis. `public_html/` atau `www/`) |
-| `FTP_PORT` | opsional | Default `21` |
-| `FTP_PROTOCOL` | opsional | `ftp` (default), `ftps`, atau `ftps-legacy` |
-
-Hanya file **web/PWA** yang di-upload (HTML, `src/`, `assets/`, `manifest.json`, `service-worker.js`, `.htaccess`).  
-Folder Capacitor/Android/native **tidak** ikut di-deploy.
-
-### Contoh isi secrets
-
-```
-FTP_SERVER=ftp.contoh.com
-FTP_USERNAME=meimo
-FTP_PASSWORD=********
-FTP_SERVER_DIR=public_html/
-```
