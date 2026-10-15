@@ -1,17 +1,16 @@
 /**
  * shared.js
- * Halaman Shared (shared.html / SPA view-shared): daftar catatan yang
- * statusnya metadata.shared = true (hasil share milik sendiri atau join).
- *
- * Phase 1: list lokal + UI shell "Gabung catatan" (belum hit server).
- * Pola UI mengikuti arsip.js agar konsisten dengan design system v1.
+ * Halaman Shared (shared.html / SPA view-shared): daftar catatan shared.
+ * Phase 2: list + join shell + unshare (lokal, Owner Key).
  */
 
 import * as documentService from "../services/document-service.js";
+import { unshareNoteLocally, getShareInfo } from "../services/share-service.js";
 import { createNoteCard } from "./note-card.js";
 import { sortNotes } from "./sorting.js";
 import { downloadNoteAsMeimo } from "./download-note.js";
 import { showToast } from "../../components/toast.js";
+import { promptDialog } from "../../components/modal.js";
 import { t, initI18n } from "../i18n/i18n.js";
 
 function byUpdatedAtDesc(notes) {
@@ -56,13 +55,40 @@ async function boot() {
       if (section) section.hidden = false;
       if (emptyState) emptyState.hidden = true;
       for (const note of sharedNotes) {
+        const info = getShareInfo(note);
+        const isOwner = !info || info.role !== "joiner";
         grid.appendChild(
           createNoteCard(note, {
             onDownload: downloadNoteAsMeimo,
-            // Phase 1: belum ada unshare/trash dari shared list
+            onUnshare: isOwner ? handleUnshare : undefined,
           })
         );
       }
+    }
+  }
+
+  async function handleUnshare(note) {
+    const key = await promptDialog({
+      title: t("shared.unshare.title"),
+      message: t("shared.unshare.message"),
+      placeholder: t("shared.unshare.placeholder"),
+      confirmLabel: t("shared.unshare.ok"),
+      cancelLabel: t("sheet.cancel"),
+      danger: true,
+    });
+    if (key == null) return;
+    if (!key) {
+      showToast(t("shared.unshare.needKey"));
+      return;
+    }
+    try {
+      await unshareNoteLocally(note, key);
+      sharedNotes = sharedNotes.filter((n) => n.id !== note.id);
+      render();
+      showToast(t("shared.unshare.done"));
+    } catch (err) {
+      console.error("[shared] unshare:", err);
+      showToast(err && err.message ? err.message : t("shared.unshare.fail"));
     }
   }
 
@@ -86,9 +112,9 @@ async function boot() {
   if (joinForm) {
     joinForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const noteId = (joinNoteId && joinNoteId.value || "").trim();
-      const code = (joinAccessCode && joinAccessCode.value || "").trim();
-      const name = (joinDisplayName && joinDisplayName.value || "").trim();
+      const noteId = ((joinNoteId && joinNoteId.value) || "").trim();
+      const code = ((joinAccessCode && joinAccessCode.value) || "").trim();
+      const name = ((joinDisplayName && joinDisplayName.value) || "").trim();
 
       if (!noteId) {
         showToast(t("shared.join.needId"));
@@ -103,7 +129,7 @@ async function boot() {
         return;
       }
 
-      // Phase 1: belum ada server — tampilkan feedback saja.
+      // Belum ada server — feedback saja.
       showToast(t("shared.join.soon"));
       if (joinSubmit) joinSubmit.disabled = false;
     });
