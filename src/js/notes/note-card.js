@@ -6,10 +6,6 @@
  *
  * Murni fungsi render (note -> DOM element), tidak menyentuh IndexedDB
  * atau Document Service selain memakai getSnippet() untuk cuplikan isi.
- *
- * Kustomisasi kartu (font judul/bentuk edge/warna & gambar latar — lihat
- * card-style-presets.js & halaman card-style.html) diterapkan di sini
- * berdasarkan `note.metadata.cardStyle` yang tersimpan, kalau ada.
  */
 
 import { createEl, openPanel, closeAllPanels } from "../utils/dom.js";
@@ -51,18 +47,12 @@ const TRASH_ICON_SVG =
   '<path d="M10 11v6"></path><path d="M14 11v6"></path>' +
   '<path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>';
 
-// Ikon "arsip" (kotak + tutup) dipakai baik untuk item menu "Arsipkan" (di
-// Home) maupun "Batalkan Arsip" (di halaman Arsip) — SAMA PERSIS dengan
-// ikon tombol akses halaman Arsip di header Home (lihat index.html), biar
-// konsisten satu bahasa visual buat konsep "arsip" di seluruh app.
 const ARCHIVE_MENU_ICON_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<polyline points="21 8 21 21 3 21 3 8"></polyline>' +
   '<rect x="1" y="3" width="22" height="5"></rect>' +
   '<line x1="10" y1="12" x2="14" y2="12"></line></svg>';
 
-// "Batalkan Arsip" — ikon arsip yang sama + garis diagonal (pola sama
-// dengan UNPIN_MENU_ICON_SVG di atas: ikon aksi + garis coret).
 const UNARCHIVE_MENU_ICON_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<polyline points="21 8 21 21 3 21 3 8"></polyline>' +
@@ -70,30 +60,25 @@ const UNARCHIVE_MENU_ICON_SVG =
   '<line x1="10" y1="12" x2="14" y2="12"></line>' +
   '<line x1="2" y1="2" x2="22" y2="22"></line></svg>';
 
-// Ikon "Download" (panah turun ke tray) — SAMA PERSIS dengan EXPORT_ICON_SVG
-// yang sebelumnya dipakai tombol "Ekspor .meimo" per-baris di halaman
-// Cadangkan & Impor (lihat src/js/notes/backup-import.js) — sekarang aksi
-// itu pindah ke sini (menu titik-tiga tiap note card), jadi ikonnya
-// dipertahankan sama biar bahasa visualnya tetap konsisten.
 const DOWNLOAD_MENU_ICON_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M12 3v12"></path><polyline points="7 10 12 15 17 10"></polyline><path d="M4 19h16"></path></svg>';
 
-// URL cantik /editor/<id> — lihat .htaccess di root project & app.js
-// (getNoteIdFromUrl) untuk cara id ini dibaca balik di halaman editor.
+const SHARE_MENU_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="9" cy="7" r="3"></circle>' +
+  '<circle cx="17" cy="7" r="3"></circle>' +
+  '<path d="M3 19c0-3 2.5-5 6-5s6 2 6 5"></path>' +
+  '<path d="M14 19c0-2 1.5-3.5 3-3.5s3 1.5 3 3.5"></path></svg>';
+
 function noteHref(note) {
   return `/editor/${encodeURIComponent(note.id)}`;
 }
 
-// URL cantik /card-style/<id> — lihat .htaccess & getNoteIdFromUrl di
-// src/js/notes/card-style.js untuk cara id ini dibaca balik di halaman itu.
 function cardStyleHref(note) {
   return `/card-style/${encodeURIComponent(note.id)}`;
 }
 
-/** Terapkan cardStyle tersimpan (kalau ada) ke elemen kartu & judulnya,
- * termasuk gambar latar (async, lewat image-service getObjectUrl).
- * Return Promise yang resolve setelah gambar latar siap (atau tidak ada). */
 function applyStoredCardStyle(cardEl, titleEl, note) {
   const cardStyle = note.metadata && note.metadata.cardStyle;
   if (!cardStyle) return Promise.resolve();
@@ -111,14 +96,8 @@ function applyStoredCardStyle(cardEl, titleEl, note) {
   );
 
   return getObjectUrl(cardStyle.bgImageAssetId).then((url) => {
-    if (!url || !cardEl.isConnected && cardEl.parentNode == null) {
-      // Masih boleh set — parent bisa belum append; isConnected false di
-      // createNoteCard sebelum appendChild. Tetap set var-nya.
-    }
     if (!url) return;
     cardEl.style.setProperty("--card-bg-image", `url("${url}")`);
-    // Tunggu decode (penting untuk GIF) supaya skeleton tidak nutup
-    // sebelum frame pertama gambar siap.
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => resolve();
@@ -128,25 +107,7 @@ function applyStoredCardStyle(cardEl, titleEl, note) {
   });
 }
 
-/**
- * Bangun & buka panel dropdown menu kartu (Sematkan / Arsipkan / Customisasi /
- * Download / Hapus), dipicu dari tombol titik-tiga. Memakai panel manager
- * yang sama dengan dropdown lain (openPanel di utils/dom.js), jadi otomatis
- * tertutup saat klik di luar / Escape / dropdown lain dibuka.
- *
- * @param {(note: object) => void} [onArchive] - item "Arsipkan" (dipakai di
- *   Home — memindahkan note ke Arsip). Mutually exclusive dengan onUnarchive
- *   secara pemakaian (satu kartu cuma butuh salah satu, tergantung halaman).
- * @param {(note: object) => void} [onUnarchive] - item "Batalkan Arsip"
- *   (dipakai di halaman Arsip — mengembalikan note ke Home).
- * @param {(note: object) => void} [onDownload] - item "Download" — ekspor
- *   note ini jadi satu file `.meimo` (lengkap dengan asset), lihat
- *   meimo-export.js. Dulunya tombol "Ekspor .meimo" per-baris di halaman
- *   Cadangkan & Impor, sekarang dipindah ke sini supaya bisa diakses
- *   langsung dari mana pun note itu tampil (Home maupun Arsip) tanpa perlu
- *   ke halaman Cadangkan & Impor dulu.
- */
-function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload) {
+function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare) {
   const panel = createEl("div", { className: "toolbar-panel__list" });
 
   if (onTogglePin) {
@@ -196,11 +157,6 @@ function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchiv
     attrs: { href: cardStyleHref(note) },
     html: `${CUSTOMIZE_ICON_SVG}<span>${t("note.customize")}</span>`,
   });
-  // Link navigasi native ke halaman Customisasi Kartu — sebelumnya tidak
-  // ada handler sama sekali, jadi klik langsung pindah halaman sementara
-  // dropdown masih penuh terbuka di snapshot View Transition. Tutup panel
-  // (dengan animasi close, lihat close() di dom.js) di sini dulu, TANPA
-  // preventDefault supaya navigasinya tetap jalan seperti biasa.
   customizeItem.addEventListener("click", () => closeAllPanels());
   panel.appendChild(customizeItem);
 
@@ -217,6 +173,19 @@ function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchiv
     panel.appendChild(downloadItem);
   }
 
+  if (onShare) {
+    const shareItem = createEl("button", {
+      className: "toolbar-panel__item",
+      attrs: { type: "button" },
+      html: `${SHARE_MENU_ICON_SVG}<span>${t("note.share")}</span>`,
+    });
+    shareItem.addEventListener("click", () => {
+      closeAllPanels();
+      onShare(note);
+    });
+    panel.appendChild(shareItem);
+  }
+
   const deleteItem = createEl("button", {
     className: "toolbar-panel__item toolbar-panel__item--danger",
     attrs: { type: "button" },
@@ -231,24 +200,7 @@ function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchiv
   openPanel(trigger, panel, { align: "left" });
 }
 
-/**
- * Kartu di grid "Terbaru" / "Semua Notes" / hasil pencarian.
- * @param {object} note
- * @param {object} [opts]
- * @param {(note: object) => void} [opts.onTrash] - dipanggil saat item menu
- *   "Hapus" ditekan.
- * @param {(note: object) => void} [opts.onTogglePin] - dipanggil saat item
- *   menu "Sematkan"/"Lepas Sematan" ditekan.
- * @param {(note: object) => void} [opts.onArchive] - dipanggil saat item menu
- *   "Arsipkan" ditekan (dipakai di Home).
- * @param {(note: object) => void} [opts.onUnarchive] - dipanggil saat item
- *   menu "Batalkan Arsip" ditekan (dipakai di halaman Arsip).
- * @param {(note: object) => void} [opts.onDownload] - dipanggil saat item
- *   menu "Download" ditekan (ekspor note ini jadi file `.meimo`). Tombol
- *   menu titik-tiga hanya ditampilkan kalau salah satu dari
- *   onTrash/onTogglePin/onArchive/onUnarchive/onDownload diberikan.
- */
-export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarchive, onDownload } = {}) {
+export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare } = {}) {
   const card = createEl("a", {
     className: "note-card anim-slide-up",
     attrs: { href: noteHref(note), "aria-label": note.title || t("note.noTitle") },
@@ -262,7 +214,7 @@ export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarch
   if (note.metadata && note.metadata.pinned) {
     header.appendChild(createEl("span", { html: PIN_ICON_SVG }).firstElementChild);
   }
-  if (onTrash || onTogglePin || onArchive || onUnarchive || onDownload) {
+  if (onTrash || onTogglePin || onArchive || onUnarchive || onDownload || onShare) {
     const menuBtn = createEl("button", {
       className: "note-card__menu-btn",
       attrs: { type: "button", "aria-label": t("note.menu"), "aria-haspopup": "true", "aria-expanded": "false" },
@@ -271,7 +223,7 @@ export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarch
     menuBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openCardMenu(menuBtn, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload);
+      openCardMenu(menuBtn, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare);
     });
     header.appendChild(menuBtn);
   }
@@ -294,22 +246,7 @@ export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarch
   return card;
 }
 
-/**
- * Kartu ringkas untuk strip "Pinned" di bagian atas Notes List.
- * @param {object} note
- * @param {object} [opts]
- * @param {(note: object) => void} [opts.onTrash] - dipanggil saat item menu
- *   "Hapus" ditekan.
- * @param {(note: object) => void} [opts.onTogglePin] - dipanggil saat item
- *   menu "Lepas Sematan" ditekan (satu-satunya cara melepas sematan, karena
- *   catatan yang disematkan tidak lagi tampil di grid utama).
- * @param {(note: object) => void} [opts.onArchive] - dipanggil saat item menu
- *   "Arsipkan" ditekan.
- * @param {(note: object) => void} [opts.onDownload] - dipanggil saat item
- *   menu "Download" ditekan. Tombol menu titik-tiga hanya ditampilkan kalau
- *   salah satu dari onTrash/onTogglePin/onArchive/onDownload diberikan.
- */
-export function createPinnedCard(note, { onTrash, onTogglePin, onArchive, onDownload } = {}) {
+export function createPinnedCard(note, { onTrash, onTogglePin, onArchive, onDownload, onShare } = {}) {
   const card = createEl("a", {
     className: "pinned-card",
     attrs: { href: noteHref(note), "aria-label": note.title || t("note.noTitle") },
@@ -317,7 +254,7 @@ export function createPinnedCard(note, { onTrash, onTogglePin, onArchive, onDown
   const header = createEl("div", { className: "pinned-card__header" });
   const titleEl = createEl("div", { className: "pinned-card__title", text: note.title || t("note.untitled") });
   header.appendChild(titleEl);
-  if (onTrash || onTogglePin || onArchive || onDownload) {
+  if (onTrash || onTogglePin || onArchive || onDownload || onShare) {
     const menuBtn = createEl("button", {
       className: "pinned-card__menu-btn",
       attrs: { type: "button", "aria-label": t("note.menu"), "aria-haspopup": "true", "aria-expanded": "false" },
@@ -326,7 +263,7 @@ export function createPinnedCard(note, { onTrash, onTogglePin, onArchive, onDown
     menuBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openCardMenu(menuBtn, note, onTrash, onTogglePin, onArchive, null, onDownload);
+      openCardMenu(menuBtn, note, onTrash, onTogglePin, onArchive, null, onDownload, onShare);
     });
     header.appendChild(menuBtn);
   }
