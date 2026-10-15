@@ -1,0 +1,1 @@
+export default {"_note":"full pack pending - use shared-locales + partial","home.title":"My Notes","app.name":"Meimo","nav.back":"Back","nav.archive":"Open Archive","title.home":"Notes — Home","title.archive":"Archive — Meimo","archive.title":"Archive","lang.en":"English","lang.id":"Indonesian","lang.ja":"Japanese"};
