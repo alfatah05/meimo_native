@@ -203,13 +203,51 @@ export async function saveNote(document) {
   return persisted;
 }
 
-/** Daftar note untuk Notes List, dengan filter dasar. */
-export async function listNotes({ includeTrashed = false, includeArchived = true } = {}) {
+/**
+ * Daftar note untuk Notes List (Home / Arsip filter), dengan filter dasar.
+ * Secara default note yang `metadata.shared` TIDAK ikut (muncul di tab Shared).
+ */
+export async function listNotes({
+  includeTrashed = false,
+  includeArchived = true,
+  includeShared = false,
+} = {}) {
   const all = await notesRepository.getAllNotes();
   return all
     .map(normalizeNote)
     .filter((note) => includeTrashed || !note.metadata.trashed)
-    .filter((note) => includeArchived || !note.metadata.archived);
+    .filter((note) => includeArchived || !note.metadata.archived)
+    .filter((note) => includeShared || !note.metadata.shared);
+}
+
+/** Daftar note yang status shared (tab Shared). Tidak termasuk trash. */
+export async function listSharedNotes() {
+  const all = await notesRepository.getAllNotes();
+  return all
+    .map(normalizeNote)
+    .filter((note) => note.metadata.shared && !note.metadata.trashed);
+}
+
+/**
+ * Tandai note sebagai shared (pindah ke tab Shared).
+ * @param {string} id — id lokal note
+ * @param {object} sharedMeta — lihat schema createDefaultMetadata().sharedMeta
+ */
+export function markNoteShared(id, sharedMeta) {
+  return patchMetadata(id, {
+    shared: true,
+    sharedMeta: sharedMeta || null,
+    // Shared note tidak tampil di strip pinned Home
+    pinned: false,
+  });
+}
+
+/** Lepas status shared (setelah unshare / restore lokal). */
+export function markNoteUnshared(id) {
+  return patchMetadata(id, {
+    shared: false,
+    sharedMeta: null,
+  });
 }
 
 /* ------------------------------------------------------------------ */
