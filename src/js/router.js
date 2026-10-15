@@ -1,6 +1,6 @@
 /**
  * router.js
- * Client-side router SPA: Home, Editor, Cadangkan, Trash, Font Manager, Arsip.
+ * Client-side router SPA: Home, Editor, Cadangkan, Trash, Font Manager, Arsip, Shared.
  *
  * - Intercept <a> internal ke rute SPA
  * - History API + same-document View Transitions
@@ -19,6 +19,8 @@ const STATIC_ROUTES = {
   "/font-manager.html": "font-manager",
   "/arsip": "arsip",
   "/arsip.html": "arsip",
+  "/shared": "shared",
+  "/shared.html": "shared",
   "/settings": "settings",
   "/settings.html": "settings",
   "/fitur-ai": "fitur-ai",
@@ -65,19 +67,16 @@ function parseRoute(pathname = window.location.pathname) {
   if (m) {
     return { name: "editor", id: m[1] ? decodeURIComponent(m[1]) : null };
   }
-  // bare path without trailing content
   const bare = path.startsWith("/") ? path : `/${path}`;
   if (STATIC_ROUTES[bare]) {
     return { name: STATIC_ROUTES[bare], id: null };
   }
-  // also try with .html stripped already handled; startsWith patterns
   for (const [key, name] of Object.entries(STATIC_ROUTES)) {
     if (key.endsWith(".html")) continue;
     if (bare === key || bare.startsWith(key + "/")) {
       return { name, id: null };
     }
   }
-  // /card-style/<id>
   const cs = bare.match(/^\/card-style(?:\/([^/]+))?\/?$/i);
   if (cs) {
     return { name: "card-style", id: cs[1] ? decodeURIComponent(cs[1]) : null };
@@ -99,6 +98,8 @@ function pathFor(route) {
       return "/font-manager";
     case "arsip":
       return "/arsip";
+    case "shared":
+      return "/shared";
     case "settings":
       return "/settings";
     case "fitur-ai":
@@ -112,16 +113,8 @@ function pathFor(route) {
   }
 }
 
-/** ViewTransition aktif terakhir (null kalau tidak support / reduced-motion). */
 let activeViewTransition = null;
 
-/**
- * Jalankan `apply` di dalam Same-Document View Transition bila didukung.
- * Mengembalikan objek ViewTransition (atau null) supaya pemanggil bisa
- * `await vt.finished` sebelum kerja berat (font load, render clip-path
- * kompleks, dsb.) — mencegah jank di tengah animasi page-in (terutama
- * halaman Customisasi Kartu yang isinya berat).
- */
 function runWithViewTransition(apply) {
   activeViewTransition = null;
   if (
@@ -130,7 +123,6 @@ function runWithViewTransition(apply) {
   ) {
     const vt = document.startViewTransition(apply);
     activeViewTransition = vt;
-    // Bersihkan referensi setelah selesai supaya tidak menahan objek lama.
     if (vt && vt.finished) {
       vt.finished.catch(() => {}).finally(() => {
         if (activeViewTransition === vt) activeViewTransition = null;
@@ -142,11 +134,6 @@ function runWithViewTransition(apply) {
   return null;
 }
 
-/**
- * Tunggu animasi page transition selesai (atau langsung resolve kalau
- * tidak ada / sudah selesai). Dipakai halaman berat (card-style) supaya
- * mutasi DOM besar tidak tabrakan dengan animasi translateY page-in.
- */
 export function waitForPageTransition() {
   const vt = activeViewTransition;
   if (!vt || !vt.finished) return Promise.resolve();
@@ -158,13 +145,9 @@ export function navigate(to, { replace = false } = {}) {
   const route = parseRoute(url.pathname);
 
   if (!route) {
-    // Native: path cantik multi-page → file .html (tanpa rewrite server)
     if (isNativePlatform()) {
       const nativeUrl = nativeMultiPageUrl(url.pathname, url.search, url.hash);
       if (nativeUrl) {
-        // Pastikan entry history saat ini = file valid (/index.html), supaya
-        // hardware back dari about/privacy tidak mendarat di /library dll
-        // yang 404 di WebView (tidak ada rewrite seperti .htaccess).
         try {
           window.history.replaceState({ spa: true }, "", "/index.html");
         } catch (_) {}
@@ -194,8 +177,6 @@ export function navigate(to, { replace = false } = {}) {
       window.history.pushState({ spa: true, route }, "", nextPath);
     }
     currentRoute = route;
-    // Jangan return/await onRoute — VT harus selesai setelah ganti view sync
-    // supaya skeleton di halaman tujuan langsung terlihat.
     if (typeof onRouteCallback === "function") {
       onRouteCallback(route);
     }
@@ -245,7 +226,6 @@ export function init(opts = {}) {
 
       const route = parseRoute(url.pathname);
       if (!route) {
-        // Native: intercept multi-page (about, privacy, …) → .html
         if (isNativePlatform()) {
           const nativeUrl = nativeMultiPageUrl(url.pathname, url.search, url.hash);
           if (nativeUrl) {
@@ -279,7 +259,6 @@ export function init(opts = {}) {
 
     runWithViewTransition(() => {
       currentRoute = route;
-      // Jangan await — sama seperti navigate() (skeleton di halaman tujuan).
       if (typeof onRouteCallback === "function") {
         onRouteCallback(route);
       }
