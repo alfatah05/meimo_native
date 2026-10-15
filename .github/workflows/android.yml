@@ -28,8 +28,12 @@ jobs:
           distribution: "temurin"
           java-version: "21"
 
+      # package "tools" sudah dihapus Google → jangan install (penyebab exit code 1)
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          packages: platform-tools
 
       - name: Accept Android licenses
         run: yes | sdkmanager --licenses || true
