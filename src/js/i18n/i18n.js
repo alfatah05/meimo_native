@@ -6,7 +6,22 @@
  * Default: English (`en`). Konten catatan user tidak diterjemahkan.
  */
 
-import { LOCALES, DEFAULT_LOCALE, LANGUAGES } from "./locales.js";
+import { LOCALES as BASE_LOCALES, DEFAULT_LOCALE, LANGUAGES } from "./locales.js";
+import { SHARED_LOCALES } from "./shared-locales.js";
+
+/** Gabungkan pack fitur (Shared, …) ke kamus dasar. */
+function mergeLocales(base, extra) {
+  const out = {};
+  for (const lang of Object.keys(base)) {
+    out[lang] = { ...base[lang], ...(extra[lang] || {}) };
+  }
+  for (const lang of Object.keys(extra)) {
+    if (!out[lang]) out[lang] = { ...extra[lang] };
+  }
+  return out;
+}
+
+export const LOCALES = mergeLocales(BASE_LOCALES, SHARED_LOCALES);
 
 export const LANG_STORAGE_KEY = "notes-app-lang";
 
