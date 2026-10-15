@@ -91,6 +91,22 @@ export function createDefaultMetadata() {
     // untuk pilihan yang valid. `null` = pakai tampilan kartu default (belum
     // pernah dikustomisasi).
     cardStyle: null,
+    // v2 Online Shared Notes — note yang di-share hilang dari Home & Arsip
+    // grid, hanya muncul di tab Shared. Lihat document-service listNotes /
+    // listSharedNotes & halaman shared.
+    shared: false,
+    /**
+     * Meta share lokal (bukan data server). null kalau belum pernah share/join.
+     * {
+     *   noteId: string,       // id publik di server
+     *   accessCode: string,   // 8 char (disimpan lokal untuk owner/referensi)
+     *   role: "owner"|"joiner",
+     *   joinedAt: ISO string,
+     *   displayName: string|null,  // nama sementara saat join (joiner)
+     *   localBackupId: string|null // id salinan backup lokal (owner), opsional
+     * }
+     */
+    sharedMeta: null,
   };
 }
 
