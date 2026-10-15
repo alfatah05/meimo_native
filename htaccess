@@ -67,6 +67,9 @@ RewriteRule ^ /trash [R=301,L]
 RewriteCond %{THE_REQUEST} \s/arsip\.html[\s?] [NC]
 RewriteRule ^ /arsip [R=301,L]
 
+RewriteCond %{THE_REQUEST} \s/shared\.html[\s?] [NC]
+RewriteRule ^ /shared [R=301,L]
+
 RewriteCond %{THE_REQUEST} \s/font-manager\.html[\s?] [NC]
 RewriteRule ^ /font-manager [R=301,L]
 
@@ -117,6 +120,9 @@ RewriteRule ^trash/?$ /index.html [NC,L]
 #     tombol ikon arsip di header Home — lihat src/js/notes/note-card.js &
 #     src/js/notes/notes-list.js). Sama polanya persis dengan /trash di atas.
 RewriteRule ^arsip/?$ /index.html [NC,L]
+
+# 3e3) URL cantik /shared -> SPA shell (tab Shared notes v2).
+RewriteRule ^shared/?$ /index.html [NC,L]
 
 # 3f) URL cantik /font-manager -> isinya disajikan dari font-manager.html
 #     (halaman Font Library / Kelola Font).
