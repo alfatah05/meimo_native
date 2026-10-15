@@ -9,6 +9,8 @@
  */
 
 import * as documentService from "../services/document-service.js";
+import { shareNoteLocally } from "../services/share-service.js";
+import { confirmDialog, infoDialog } from "../../components/modal.js";
 import { debounce } from "../utils/debounce.js";
 import { createNoteCard, createPinnedCard } from "./note-card.js";
 import { t, initI18n } from "../i18n/i18n.js";
@@ -29,7 +31,6 @@ import "../utils/trap-back-navigation.js";
 let __refreshHomeFn = null;
 /** Skeleton Home belum pernah disembunyikan di sesi ini. */
 let __homeSkeletonPending = true;
-
 
 const SEARCH_DEBOUNCE_MS = 120;
 
@@ -54,7 +55,6 @@ function collectBgReady(root) {
   });
   return promises;
 }
-
 
 /** Bangun panel dropdown berisi pilihan urutan (dibuka lewat openPanel dom.js). */
 function buildSortPanel(onPick) {
@@ -111,7 +111,6 @@ async function boot() {
     });
   }
 
-  /** Pindahkan satu catatan ke Sampah, lalu render ulang list dengan Undo. */
   async function handleTrash(note) {
     await documentService.moveToTrash(note.id);
     allNotes = allNotes.filter((n) => n.id !== note.id);
@@ -126,16 +125,12 @@ async function boot() {
     });
   }
 
-  /** Balik status sematan satu catatan, lalu render ulang list. */
   async function handleTogglePin(note) {
     const updated = await toggleNotePin(note);
     allNotes = allNotes.map((n) => (n.id === updated.id ? updated : n));
     render(searchInput.value);
   }
 
-  /** Arsipkan satu catatan (hilang dari Home, tetap ada di halaman Arsip
-   * lewat /arsip), lalu render ulang list dengan Undo — pola sama persis
-   * dengan handleTrash() di atas. */
   async function handleArchive(note) {
     await documentService.setArchived(note.id, true);
     allNotes = allNotes.filter((n) => n.id !== note.id);
@@ -150,26 +145,43 @@ async function boot() {
     });
   }
 
+  /** Bagikan catatan (Phase 2 lokal): pindah ke tab Shared + tampilkan ID/kode/Owner Key. */
+  async function handleShare(note) {
+    const ok = await confirmDialog({
+      title: t("shared.confirm.title"),
+      message: t("shared.confirm.message"),
+      confirmLabel: t("shared.confirm.ok"),
+      cancelLabel: t("sheet.cancel"),
+      danger: false,
+    });
+    if (!ok) return;
+    try {
+      const result = await shareNoteLocally(note);
+      allNotes = allNotes.filter((n) => n.id !== note.id);
+      render(searchInput.value);
+      await infoDialog({
+        title: t("shared.success.title"),
+        message: t("shared.success.message"),
+        rows: [
+          { label: t("shared.success.noteId"), value: result.noteId },
+          { label: t("shared.success.code"), value: result.accessCode },
+          { label: t("shared.success.ownerKey"), value: result.ownerKey },
+        ],
+        okLabel: t("shared.success.ok"),
+        onCopy: () => showToast(t("shared.success.copied")),
+      });
+    } catch (err) {
+      console.error("[notes-list] share:", err);
+      showToast(err && err.message ? err.message : t("shared.fail"));
+    }
+  }
+
   function render(query) {
-    // FIX v1.3.8: sebelumnya skeleton (#homeSkeleton) baru disembunyikan
-    // SETELAH `Promise.all([ensureInstalledFontsLoaded(), refreshData()])`
-    // di boot() selesai KEDUANYA — tapi refreshData() (yang manggil
-    // render() ini) sering selesai duluan sebelum font kustom selesai
-    // dimuat, jadi ada jeda di mana card note ASLI sudah tampil (di bawah
-    // section pinned/recent yang baru di-unhide) SEMENTARA skeleton di
-    // atasnya masih kelihatan juga — keduanya numpuk. Skeleton cuma perlu
-    // tampil sampai render pertama ini benar-benar jalan, jadi disembunyikan
-    // di sini juga (paling awal), atomically bareng konten aslinya muncul —
-    // bukan digantungkan ke Promise lain yang tidak terkait langsung ke DOM
-    // ini. Aman dipanggil berkali-kali (search/toggle pin ikut manggil
-    // render() lagi setelahnya) karena tinggal no-op kalau sudah hidden.
     const homeSkeleton = document.getElementById("homeSkeleton");
-    // Skeleton disembunyikan SETELAH kartu + gambar latar siap (lihat akhir render).
 
     const trimmed = (query || "").trim();
     const filtered = filterNotes(allNotes, trimmed);
 
-    // Pinned lebih dulu: dipisah ke strip tersendiri di atas, sisanya di grid.
     const activeSort = getSort();
     const pinned = sortNotes(filtered.filter((note) => note.metadata.pinned), activeSort);
     const others = sortNotes(filtered.filter((note) => !note.metadata.pinned), activeSort);
@@ -177,7 +189,17 @@ async function boot() {
     pinnedStrip.innerHTML = "";
     if (pinned.length) {
       pinnedSection.hidden = false;
-      for (const note of pinned) pinnedStrip.appendChild(createPinnedCard(note, { onTrash: handleTrash, onTogglePin: handleTogglePin, onArchive: handleArchive, onDownload: downloadNoteAsMeimo }));
+      for (const note of pinned) {
+        pinnedStrip.appendChild(
+          createPinnedCard(note, {
+            onTrash: handleTrash,
+            onTogglePin: handleTogglePin,
+            onArchive: handleArchive,
+            onDownload: downloadNoteAsMeimo,
+            onShare: handleShare,
+          })
+        );
+      }
     } else {
       pinnedSection.hidden = true;
     }
@@ -186,7 +208,17 @@ async function boot() {
     recentSectionTitle.textContent = trimmed ? t("home.searchResults") : t("home.recent");
     if (others.length) {
       recentSection.hidden = false;
-      for (const note of others) notesGrid.appendChild(createNoteCard(note, { onTrash: handleTrash, onTogglePin: handleTogglePin, onArchive: handleArchive, onDownload: downloadNoteAsMeimo }));
+      for (const note of others) {
+        notesGrid.appendChild(
+          createNoteCard(note, {
+            onTrash: handleTrash,
+            onTogglePin: handleTogglePin,
+            onArchive: handleArchive,
+            onDownload: downloadNoteAsMeimo,
+            onShare: handleShare,
+          })
+        );
+      }
     } else {
       recentSection.hidden = true;
     }
@@ -204,13 +236,8 @@ async function boot() {
       emptyState.hidden = true;
     }
 
-    // Tunggu gambar latar kartu (GIF/foto) sebelum nutup skeleton di reveal pertama.
-    // Search/pin ulang tidak menampilkan skeleton lagi — no-op.
     if (__homeSkeletonPending && homeSkeleton) {
-      const bgReady = [
-        ...collectBgReady(pinnedStrip),
-        ...collectBgReady(notesGrid),
-      ];
+      const bgReady = [...collectBgReady(pinnedStrip), ...collectBgReady(notesGrid)];
       const done = () => {
         if (!__homeSkeletonPending) return;
         __homeSkeletonPending = false;
@@ -219,7 +246,6 @@ async function boot() {
       if (!bgReady.length) {
         done();
       } else {
-        // Timeout jaga-jaga supaya skeleton tidak menggantung kalau asset rusak.
         const timeout = new Promise((r) => setTimeout(r, 4000));
         Promise.race([Promise.allSettled(bgReady), timeout]).then(done);
       }
@@ -231,28 +257,6 @@ async function boot() {
   const renderDebounced = debounce(() => render(searchInput.value), SEARCH_DEBOUNCE_MS);
   searchInput.addEventListener("input", renderDebounced);
 
-  // Muat lebih dulu @font-face untuk font kustom yang sudah pernah diunduh
-  // (lihat font-service.js) — kalau tidak, note card yang judulnya memakai
-  // font kustom (lihat metadata.cardStyle.titleFont, notes/card-style.js)
-  // akan jatuh ke font fallback karena browser belum tahu font tsb.
-  // Note yang trashed/archived tidak muncul di Home (bukan dihapus dari DB).
-  //
-  // BUGFIX: sebelumnya fungsi ini juga langsung manggil render() di baris
-  // terakhirnya, dan boot() nunggu `Promise.all([ensureInstalledFontsLoaded(),
-  // refreshData()])` — tapi render() (yang menyembunyikan #homeSkeleton,
-  // lihat catatan di render()) jalan begitu refreshData() SENDIRI selesai,
-  // TIDAK ikut nunggu ensureInstalledFontsLoaded(). Baca metadata note dari
-  // IndexedDB (refreshData) hampir selalu jauh lebih cepat daripada decode
-  // font kustom jadi FontFace (ensureInstalledFontsLoaded), jadi urutan
-  // nyatanya: refreshData() selesai duluan -> render() jalan -> skeleton
-  // kehapus & note card muncul pakai font FALLBACK -> beberapa saat
-  // kemudian font kustom baru kelar dimuat -> card "meloncat" ganti font
-  // asli, padahal skeleton-nya sudah tidak ada buat nutupin loncatan itu.
-  // Fix: refreshData() sekarang HANYA fetch (tidak render), render() cuma
-  // dipanggil sekali di boot() setelah `Promise.all` KEDUA promise itu
-  // benar-benar selesai — skeleton jadi nutupin loading data MAUPUN font
-  // sekaligus, baru hilang atomically bareng note card yang sudah pasti
-  // pakai font final (bukan font fallback yang bakal ganti lagi).
   async function refreshData() {
     allNotes = await documentService.listNotes({ includeTrashed: false, includeArchived: false });
   }
@@ -262,8 +266,6 @@ async function boot() {
     if (homeSkeleton) homeSkeleton.hidden = true;
   }
 
-  /** Promise dengan batas waktu — kalau macet (IDB/font/seed), jangan biarkan
-   * skeleton Home menggantung selamanya. */
   function withTimeout(promise, ms, label) {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -289,10 +291,6 @@ async function boot() {
     });
   }
 
-  // Note bawaan / font / listNotes — dibungkus try/finally supaya
-  // #homeSkeleton SELALU dilepas, bahkan kalau seed/font/IDB macet atau
-  // throw. Tanpa ini, satu promise yang hang membuat Home stuck di
-  // skeleton selamanya (page lain yang tidak lewat jalur ini tetap aman).
   try {
     try {
       await withTimeout(seedDefaultNotesIfNeeded(), 15000, "seedDefaultNotes");
@@ -302,8 +300,6 @@ async function boot() {
     try {
       await withTimeout(
         (async () => {
-          // List notes dulu (ringan), lalu FontFace hanya untuk titleFont
-          // yang benar-benar dipakai di kartu Home — sisanya idle.
           await refreshData();
           const titleFonts = [
             ...new Set(
@@ -326,7 +322,6 @@ async function boot() {
       );
     } catch (err) {
       console.error("[notes-list] fonts/listNotes gagal/timeout:", err);
-      // Coba minimal ambil list notes tanpa nunggu font
       try {
         await withTimeout(refreshData(), 8000, "listNotes-retry");
       } catch (err2) {
@@ -339,15 +334,9 @@ async function boot() {
     console.error("[notes-list] boot gagal:", err);
     hideHomeSkeleton();
   } finally {
-    // Jaga-jaga kalau render() tidak sempat dipanggil / throw di tengah
     hideHomeSkeleton();
   }
 
-  /** Dipakai khusus untuk bfcache-restore (initRefreshOnRestore di bawah):
-   * fetch ulang + render ulang. Font kustom TIDAK perlu dimuat ulang di
-   * sini — state `document.fonts` (FontFace yang sudah ditambahkan) ikut
-   * dipulihkan utuh oleh bfcache bareng seluruh state JS lainnya, jadi
-   * sudah pasti masih ada tanpa perlu ensureInstalledFontsLoaded() lagi. */
   async function refreshAndRender() {
     try {
       await refreshData();
@@ -358,29 +347,20 @@ async function boot() {
     }
   }
 
-  // Kalau halaman ini dipulihkan dari bfcache (balik lewat back HP), JANGAN
-  // navigasi ulang apa pun (lihat catatan panjang di reload-on-restore.js
-  // soal kenapa itu malah merusak animasi) — cukup fetch ulang data &
-  // render ulang ke DOM yang sudah ada, diam-diam, tanpa re-attach listener
-  // apa pun (refreshAndRender() di atas cuma fetch+render, aman dipanggil
-  // ulang berkali-kali).
   initRefreshOnRestore(refreshAndRender);
   __refreshHomeFn = refreshAndRender;
 }
 
-/** Dipakai SPA: fetch ulang + render list saat kembali dari editor. */
 export async function refreshHome() {
   if (typeof __refreshHomeFn === "function") {
     return __refreshHomeFn();
   }
 }
 
-/** Init untuk SPA / multi-page. Dipanggil otomatis kalau BUKAN mode SPA. */
 export async function initHome() {
   return boot();
 }
 
-// Auto-boot hanya di mode multi-page klasik (bukan SPA shell).
 if (!window.__MEIMO_SPA__) {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
