@@ -1,6 +1,6 @@
 /**
  * spa-app.js
- * SPA shell: Home, Editor, Cadangkan, Trash, Font Manager, Arsip.
+ * SPA shell: Home, Editor, Cadangkan, Trash, Font Manager, Arsip, Shared.
  */
 
 import { init as initRouter } from "./router.js";
@@ -15,6 +15,7 @@ const VIEW_IDS = {
   trash: "view-trash",
   "font-manager": "view-font-manager",
   arsip: "view-arsip",
+  shared: "view-shared",
   "card-style": "view-card-style",
   settings: "view-settings",
   "fitur-ai": "view-fitur-ai",
@@ -28,6 +29,7 @@ const TITLE_KEYS = {
   trash: "title.trash",
   "font-manager": "title.fonts",
   arsip: "title.archive",
+  shared: "title.shared",
   "card-style": "title.cardStyle",
   settings: "title.settings",
   "fitur-ai": "title.ai",
@@ -43,6 +45,7 @@ const inited = {
   trash: false,
   "font-manager": false,
   arsip: false,
+  shared: false,
   "card-style": false,
   settings: false,
   "fitur-ai": false,
@@ -67,11 +70,9 @@ function showView(name) {
     node.hidden = !active;
     node.setAttribute("aria-hidden", active ? "false" : "true");
   }
-  // body class for CSS (editor chrome hide, etc.)
   for (const routeName of Object.keys(VIEW_IDS)) {
     document.body.classList.toggle(`spa-${routeName}-active`, routeName === name);
   }
-  // font-manager has a slash in name — class spa-font-manager-active
   document.body.classList.toggle("spa-home-active", name === "home");
   document.body.classList.toggle("spa-editor-active", name === "editor");
 }
@@ -128,9 +129,7 @@ async function teardownEditor() {
 }
 
 async function ensureEditor() {
-  // Tampilkan view + skeleton dulu (template punya .is-loading / skeleton)
   if (inited.editor) {
-    // teardown sync-ish: destroy + restore supaya skeleton muncul
     try {
       const mod = await import("./app.js");
       if (typeof mod.destroyEditor === "function") mod.destroyEditor();
@@ -139,7 +138,6 @@ async function ensureEditor() {
   }
   restoreTemplate("editor");
   showView("editor");
-  // Pastikan state loading terlihat
   try {
     const page = document.querySelector("#view-editor .note-page");
     if (page) page.classList.add("is-loading");
@@ -158,34 +156,18 @@ async function ensureEditor() {
   inited.editor = true;
 }
 
-/* ---------- Secondary pages: restore template + init each visit ---------- */
-/**
- * @param {string} name
- * @param {string} importPath
- * @param {string} initExport
- * @param {{ waitTransition?: boolean }} [opts]
- *   waitTransition: tunggu animasi page-in selesai dulu sebelum init()
- *   memutasi DOM (font load + banyak clip-path di Customisasi Kartu
- *   sebelumnya jalan di tengah animasi → terasa berat/lag).
- */
+/* ---------- Secondary pages ---------- */
 async function ensureSecondary(name, importPath, initExport, opts = {}) {
-  // 1) Restore template (skeleton terlihat lagi) + tampilkan view SEGERA
-  //    (bagian sync ini sudah dipanggil di onRoute; tetap aman dipanggil ulang)
   restoreTemplate(name);
   showView(name);
 
-  // 2) Mulai fetch modul segera (paralel dengan animasi)
   const modPromise = import(importPath);
 
-  // 3) Untuk halaman berat: tunggu page transition selesai dulu supaya
-  //    mutasi DOM di init tidak tabrakan dengan animasi translateY.
   if (opts.waitTransition) {
     try {
       const { waitForPageTransition } = await import("./router.js");
       await waitForPageTransition();
-    } catch (_) {
-      /* ignore */
-    }
+    } catch (_) {}
   }
 
   const mod = await modPromise;
@@ -195,24 +177,15 @@ async function ensureSecondary(name, importPath, initExport, opts = {}) {
   inited[name] = true;
 }
 
-async function leaveSecondary(name) {
-  if (!inited[name]) return;
-  restoreTemplate(name);
-  inited[name] = false;
-}
-
 async function onRoute(route) {
   if (!route) return;
   const prev = currentName;
   currentName = route.name;
   setTitle(route.name);
 
-  // 1) GANTI VIEW SEGERA (sync) — ini yang ditangkap View Transition.
-  //    Jangan await load data sebelum showView.
   if (route.name === "home") {
     showView("home");
   } else if (route.name === "editor") {
-    // skeleton lewat restore di ensureEditor; show dulu agar tidak blank
     if (!inited.editor) {
       restoreTemplate("editor");
       try {
@@ -226,10 +199,8 @@ async function onRoute(route) {
     showView(route.name);
   }
 
-  // 2) Cleanup halaman sebelumnya (setelah view tujuan sudah tampil)
   if (prev && prev !== route.name) {
     if (prev === "editor") {
-      // destroy tanpa restore dulu (view editor sudah diganti/hidden)
       try {
         const mod = await import("./app.js");
         if (typeof mod.destroyEditor === "function") mod.destroyEditor();
@@ -240,7 +211,6 @@ async function onRoute(route) {
     }
   }
 
-  // 3) Load data di halaman tujuan (skeleton sudah terlihat)
   if (route.name === "home") {
     await ensureHome();
     if (prev && prev !== "home") await refreshHomeIfPossible();
@@ -266,10 +236,11 @@ async function onRoute(route) {
     await ensureSecondary("arsip", "./notes/arsip.js", "initArsip");
     return;
   }
+  if (route.name === "shared") {
+    await ensureSecondary("shared", "./notes/shared.js", "initShared");
+    return;
+  }
   if (route.name === "card-style") {
-    // Tunggu animasi page-in selesai dulu — boot() memuat semua FontFace
-    // + merender banyak swatch clip-path yang mahal di GPU; kalau jalan
-    // di tengah animasi, naik-nya terasa lambat & tidak smooth.
     await ensureSecondary("card-style", "./notes/card-style.js", "initCardStyle", {
       waitTransition: true,
     });
@@ -286,15 +257,12 @@ async function onRoute(route) {
 }
 
 async function bootSpa() {
-  // Bahasa UI (English default) — apply data-i18n sebelum view pertama tampil
   try {
     initI18n();
   } catch (e) {
     console.warn("[spa] i18n init failed", e);
   }
 
-  // Native (Capacitor only): init bridge + optional IDB→Filesystem migration.
-  // Dynamic import keeps the web/PWA path clean — modules load but isNative() is false.
   try {
     const bridge = await import("./native/capacitor-bridge.js");
     await bridge.initNative();
@@ -321,7 +289,6 @@ async function bootSpa() {
 
   initRouter({ onRoute });
 
-  // Prefetch modul berat di idle (sama seperti native stabil)
   const preloadHeavy = () => {
     import("./fonts/font-manager.js").catch(() => {});
     import("./notes/card-style.js").catch(() => {});
