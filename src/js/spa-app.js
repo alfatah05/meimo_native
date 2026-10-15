@@ -116,18 +116,6 @@ async function refreshHomeIfPossible() {
 }
 
 /* ---------- Editor ---------- */
-async function teardownEditor() {
-  if (!inited.editor) return;
-  try {
-    const mod = await import("./app.js");
-    if (typeof mod.destroyEditor === "function") mod.destroyEditor();
-  } catch (e) {
-    console.warn("[spa] destroyEditor:", e);
-  }
-  inited.editor = false;
-  restoreTemplate("editor");
-}
-
 async function ensureEditor() {
   if (inited.editor) {
     try {
@@ -158,6 +146,11 @@ async function ensureEditor() {
 
 /* ---------- Secondary pages ---------- */
 async function ensureSecondary(name, importPath, initExport, opts = {}) {
+  if (!el(VIEW_IDS[name])) {
+    // View belum ada di index.html — fallback multi-page (shared.html, dll.)
+    window.location.assign(`/${name}.html`);
+    return;
+  }
   restoreTemplate(name);
   showView(name);
 
@@ -195,6 +188,10 @@ async function onRoute(route) {
     }
     showView("editor");
   } else if (VIEW_IDS[route.name]) {
+    if (!el(VIEW_IDS[route.name])) {
+      window.location.assign(`/${route.name}.html`);
+      return;
+    }
     restoreTemplate(route.name);
     showView(route.name);
   }
@@ -275,16 +272,25 @@ async function bootSpa() {
     console.warn("[spa] native/migration init failed", e);
   }
 
-  for (const vid of Object.values(VIEW_IDS)) {
+  // Core views wajib ada; shared boleh belum (fallback shared.html).
+  const required = ["view-home", "view-editor"];
+  for (const vid of required) {
     if (!el(vid)) {
-      console.error("[spa] missing view:", vid);
+      console.error("[spa] missing required view:", vid);
       return;
     }
+  }
+  for (const vid of Object.values(VIEW_IDS)) {
+    if (!el(vid)) console.warn("[spa] optional view missing:", vid);
   }
 
   captureTemplates();
 
   const initial = window.__MEIMO_SPA_INITIAL__ || "home";
+  if (initial === "shared" && !el("view-shared")) {
+    window.location.replace("/shared.html");
+    return;
+  }
   showView(VIEW_IDS[initial] ? initial : "home");
 
   initRouter({ onRoute });
