@@ -1,0 +1,6 @@
+# Optional: pretty URLs /api/poll → index.php?action=poll
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^([a-z0-9\-]+)/?$ index.php?action=$1 [QSA,L]
+</IfModule>

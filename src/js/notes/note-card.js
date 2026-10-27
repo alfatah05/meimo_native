@@ -107,7 +107,23 @@ function applyStoredCardStyle(cardEl, titleEl, note) {
   });
 }
 
-function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare) {
+
+const UNSHARE_MENU_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="9" cy="7" r="3"></circle><circle cx="17" cy="7" r="3"></circle>' +
+  '<path d="M3 19c0-3 2.5-5 6-5"></path><path d="M14 19c0-2 1.5-3.5 3-3.5"></path>' +
+  '<line x1="4" y1="4" x2="20" y2="20"></line></svg>';
+
+const KEY_MENU_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="8" cy="15" r="4"></circle><path d="M12 15h8"></path><path d="M18 12v6"></path></svg>';
+
+const LINK_MENU_ICON_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>' +
+  '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>';
+
+function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare, onUnshare, onChangeCode, onShowShareInfo) {
   const panel = createEl("div", { className: "toolbar-panel__list" });
 
   if (onTogglePin) {
@@ -186,6 +202,45 @@ function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchiv
     panel.appendChild(shareItem);
   }
 
+  if (onShowShareInfo) {
+    const infoItem = createEl("button", {
+      className: "toolbar-panel__item",
+      attrs: { type: "button" },
+      html: `${LINK_MENU_ICON_SVG}<span>${t("note.shareInfo") || "Share info"}</span>`,
+    });
+    infoItem.addEventListener("click", () => {
+      closeAllPanels();
+      onShowShareInfo(note);
+    });
+    panel.appendChild(infoItem);
+  }
+
+  if (onChangeCode) {
+    const codeItem = createEl("button", {
+      className: "toolbar-panel__item",
+      attrs: { type: "button" },
+      html: `${KEY_MENU_ICON_SVG}<span>${t("note.changeCode") || "Change access code"}</span>`,
+    });
+    codeItem.addEventListener("click", () => {
+      closeAllPanels();
+      onChangeCode(note);
+    });
+    panel.appendChild(codeItem);
+  }
+
+  if (onUnshare) {
+    const unshareItem = createEl("button", {
+      className: "toolbar-panel__item toolbar-panel__item--danger",
+      attrs: { type: "button" },
+      html: `${UNSHARE_MENU_ICON_SVG}<span>${t("note.unshare")}</span>`,
+    });
+    unshareItem.addEventListener("click", () => {
+      closeAllPanels();
+      onUnshare(note);
+    });
+    panel.appendChild(unshareItem);
+  }
+
   const deleteItem = createEl("button", {
     className: "toolbar-panel__item toolbar-panel__item--danger",
     attrs: { type: "button" },
@@ -200,7 +255,7 @@ function openCardMenu(trigger, note, onTrash, onTogglePin, onArchive, onUnarchiv
   openPanel(trigger, panel, { align: "left" });
 }
 
-export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare } = {}) {
+export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare, onUnshare, onChangeCode, onShowShareInfo } = {}) {
   const card = createEl("a", {
     className: "note-card anim-slide-up",
     attrs: { href: noteHref(note), "aria-label": note.title || t("note.noTitle") },
@@ -214,7 +269,7 @@ export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarch
   if (note.metadata && note.metadata.pinned) {
     header.appendChild(createEl("span", { html: PIN_ICON_SVG }).firstElementChild);
   }
-  if (onTrash || onTogglePin || onArchive || onUnarchive || onDownload || onShare) {
+  if (onTrash || onTogglePin || onArchive || onUnarchive || onDownload || onShare || onUnshare || onChangeCode || onShowShareInfo) {
     const menuBtn = createEl("button", {
       className: "note-card__menu-btn",
       attrs: { type: "button", "aria-label": t("note.menu"), "aria-haspopup": "true", "aria-expanded": "false" },
@@ -223,7 +278,7 @@ export function createNoteCard(note, { onTrash, onTogglePin, onArchive, onUnarch
     menuBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      openCardMenu(menuBtn, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare);
+      openCardMenu(menuBtn, note, onTrash, onTogglePin, onArchive, onUnarchive, onDownload, onShare, onUnshare, onChangeCode, onShowShareInfo);
     });
     header.appendChild(menuBtn);
   }

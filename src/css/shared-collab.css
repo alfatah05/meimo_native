@@ -1,0 +1,27 @@
+/* Phase 4 — block locked by another collaborator */
+#editorBody [data-block-id].is-shared-locked {
+  position: relative;
+  opacity: 0.72;
+  cursor: not-allowed;
+  outline: 1px dashed color-mix(in srgb, var(--color-accent, #6c8cff) 50%, transparent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+#editorBody [data-block-id].is-shared-locked::after {
+  content: attr(data-locked-by);
+  position: absolute;
+  top: -0.55rem;
+  right: 0.25rem;
+  font-size: 0.65rem;
+  line-height: 1;
+  padding: 0.15rem 0.35rem;
+  border-radius: 999px;
+  background: var(--color-surface-elevated, var(--color-surface));
+  color: var(--color-text-muted, #888);
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

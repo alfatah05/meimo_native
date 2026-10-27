@@ -8,6 +8,8 @@
 
 import { LOCALES as BASE_LOCALES, DEFAULT_LOCALE, LANGUAGES } from "./locales.js";
 import { SHARED_LOCALES } from "./shared-locales.js";
+import { JOIN_PUBLIC_LOCALES } from "./join-public-locales.js";
+import { HARDENING_LOCALES } from "./hardening-locales.js";
 
 /** Gabungkan pack fitur (Shared, …) ke kamus dasar. */
 function mergeLocales(base, extra) {
@@ -21,7 +23,7 @@ function mergeLocales(base, extra) {
   return out;
 }
 
-export const LOCALES = mergeLocales(BASE_LOCALES, SHARED_LOCALES);
+export const LOCALES = mergeLocales(mergeLocales(mergeLocales(BASE_LOCALES, SHARED_LOCALES), JOIN_PUBLIC_LOCALES), HARDENING_LOCALES);
 
 export const LANG_STORAGE_KEY = "notes-app-lang";
 

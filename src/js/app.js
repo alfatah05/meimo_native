@@ -34,6 +34,7 @@ import { ensureInstalledFontsLoaded, extractFontFamiliesFromHtml } from "./servi
 import * as audioPlayerService from "./services/audio-player-service.js";
 import { hasActiveSheet, closeActiveSheet } from "./toolbar/active-sheet.js";
 import { debounce } from "./utils/debounce.js";
+import { attachSharedCollab } from "./editor/shared-collab.js";
 
 const AUTOSAVE_DELAY_MS = 600;
 
@@ -93,6 +94,7 @@ let __editorGlobalListenersBound = false;
 /** save handler aktif (di-update tiap boot/remount SPA). */
 let __activeSaveNow = null;
 let __activeSaveDebounced = null;
+let __activeCollab = null;
 
 async function boot() {
   const bootStartedAt = performance.now();
@@ -139,9 +141,14 @@ async function boot() {
   const state = createEditorState(doc);
 
   const saveNow = () => {
-    documentService.saveNote(state.getDocument()).catch((err) => {
+    const d = state.getDocument();
+    documentService.saveNote(d).catch((err) => {
       console.error("Gagal menyimpan catatan:", err);
     });
+    // Shared: collab module juga push via onChange; flush eksplisit di sini
+    if (__activeCollab && typeof __activeCollab.pushNow === "function") {
+      __activeCollab.pushNow().catch(() => {});
+    }
   };
   const saveDebounced = debounce(saveNow, AUTOSAVE_DELAY_MS);
 
@@ -302,6 +309,37 @@ async function boot() {
         if (typeof __activeSaveDebounced === "function") __activeSaveDebounced();
       }
     });
+  }
+
+  // Phase 4: shared note → dual-path sync + per-block lock
+  try {
+    if (__activeCollab && typeof __activeCollab.stop === "function") {
+      __activeCollab.stop();
+      __activeCollab = null;
+    }
+    __activeCollab = attachSharedCollab({
+      state,
+      bodyEl,
+      titleEl,
+      renderAll: () => editor.renderAll && editor.renderAll(),
+      saveLocal: (doc) => {
+        const d = doc || state.getDocument();
+        documentService.saveNote(d).catch((err) => {
+          console.error("Gagal menyimpan catatan (shared local):", err);
+        });
+      },
+      onStatus: (msg) => {
+        try {
+          import("../components/toast.js").then((m) => {
+            if (!m || !m.showToast) return;
+            if (msg === "offline") m.showToast(t ? t("shared.offline") : "Offline — edits queued", "warn");
+            if (msg === "online") m.showToast(t ? t("shared.online") : "Online — syncing", "success");
+          }).catch(() => {});
+        } catch (_) {}
+      },
+    });
+  } catch (e) {
+    console.warn("[app] shared collab:", e);
   }
 
   // Fokus otomatis ke judul saat catatan baru dibuka kosong.

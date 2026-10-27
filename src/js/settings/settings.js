@@ -1,3 +1,4 @@
+import { initOwnerKeySettings } from "./owner-key-settings.js";
 /**
  * settings.js
  * Halaman Pengaturan: Font Library, Tema, Bahasa, Sampah, Cadangkan, Fitur AI.
@@ -94,6 +95,8 @@ async function boot() {
 }
 
 export async function initSettings() {
+  try { await initOwnerKeySettings(); } catch (e) { console.warn("[settings] owner key UI:", e); }
+
   return boot();
 }
 

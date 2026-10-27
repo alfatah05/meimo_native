@@ -1,30 +1,34 @@
 /**
- * shared.js
- * Halaman Shared (shared.html / SPA view-shared): daftar catatan shared.
- * Phase 2: list + join shell + unshare (lokal, Owner Key).
+ * shared.js — Shared tab (Phase 2–6)
+ * list, join, unshare (backup dulu), change code, show share info
  */
 
 import * as documentService from "../services/document-service.js";
-import { unshareNoteLocally, getShareInfo } from "../services/share-service.js";
+import {
+  unshareNoteLocally,
+  getShareInfo,
+  joinSharedNote,
+  changeAccessCode,
+  generateAccessCode,
+  getShareJoinUrl,
+} from "../services/share-service.js";
 import { createNoteCard } from "./note-card.js";
 import { sortNotes } from "./sorting.js";
 import { downloadNoteAsMeimo } from "./download-note.js";
 import { showToast } from "../../components/toast.js";
-import { promptDialog } from "../../components/modal.js";
+import { promptDialog, confirmDialog, infoDialog } from "../../components/modal.js";
 import { t, initI18n } from "../i18n/i18n.js";
 
 function byUpdatedAtDesc(notes) {
   return sortNotes(notes, "updatedAt");
 }
 
-/** Validasi nama sementara: min 3 huruf, hanya a-zA-Z (spasi di tengah boleh). */
 export function isValidDisplayName(name) {
   const s = (name || "").trim();
   if (s.length < 3) return false;
   return /^[A-Za-z]+(?: [A-Za-z]+)*$/.test(s);
 }
 
-/** Access code 8 char alphanumeric case-sensitive. */
 export function isValidAccessCode(code) {
   return /^[A-Za-z0-9]{8}$/.test((code || "").trim());
 }
@@ -61,13 +65,94 @@ async function boot() {
           createNoteCard(note, {
             onDownload: downloadNoteAsMeimo,
             onUnshare: isOwner ? handleUnshare : undefined,
+            onChangeCode: isOwner ? handleChangeCode : undefined,
+            onShowShareInfo: handleShowShareInfo,
           })
         );
       }
     }
   }
 
+  async function handleShowShareInfo(note) {
+    const info = getShareInfo(note) || {};
+    const noteId = info.noteId || note.id;
+    const code = info.accessCode || "—";
+    let shareUrl = "";
+    try {
+      shareUrl = getShareJoinUrl(noteId);
+    } catch (_) {
+      shareUrl = `/s/${noteId}`;
+    }
+    await infoDialog({
+      title: t("shared.success.title"),
+      message: t("shared.success.message"),
+      rows: [
+        { label: t("shared.success.noteId"), value: noteId },
+        { label: t("shared.success.code"), value: code },
+        { label: t("shared.success.link") || "Join link", value: shareUrl },
+      ],
+      okLabel: t("shared.success.ok"),
+      onCopy: () => showToast(t("shared.success.copied")),
+    });
+  }
+
+  async function handleChangeCode(note) {
+    const key = await promptDialog({
+      title: t("shared.changeCode.title"),
+      message: t("shared.changeCode.message"),
+      placeholder: t("shared.unshare.placeholder"),
+      confirmLabel: t("shared.changeCode.continue"),
+      cancelLabel: t("sheet.cancel"),
+      danger: false,
+    });
+    if (key == null) return;
+    if (!key) {
+      showToast(t("shared.unshare.needKey"));
+      return;
+    }
+    let newCode = await promptDialog({
+      title: t("shared.changeCode.newTitle"),
+      message: t("shared.changeCode.newMessage"),
+      placeholder: "Ab3xY9kQ",
+      confirmLabel: t("shared.changeCode.ok"),
+      cancelLabel: t("sheet.cancel"),
+      danger: false,
+    });
+    if (newCode == null) return;
+    newCode = (newCode || "").trim();
+    if (!newCode) {
+      // auto-generate if empty
+      newCode = generateAccessCode();
+    }
+    try {
+      const updated = await changeAccessCode(note, key, newCode);
+      sharedNotes = sharedNotes.map((n) => (n.id === note.id ? updated : n));
+      render();
+      showToast(t("shared.changeCode.done") + ": " + newCode);
+    } catch (err) {
+      console.error("[shared] changeCode:", err);
+      showToast(err && err.message ? err.message : t("shared.changeCode.fail"));
+    }
+  }
+
   async function handleUnshare(note) {
+    // Phase 6: sarankan backup dulu
+    const wantBackup = await confirmDialog({
+      title: t("shared.unshare.backupTitle"),
+      message: t("shared.unshare.backupMessage"),
+      confirmLabel: t("shared.unshare.backupYes"),
+      cancelLabel: t("shared.unshare.backupNo"),
+      danger: false,
+    });
+    if (wantBackup) {
+      try {
+        await downloadNoteAsMeimo(note);
+        showToast(t("shared.unshare.backupDone"));
+      } catch (e) {
+        console.warn("[shared] backup before unshare:", e);
+      }
+    }
+
     const key = await promptDialog({
       title: t("shared.unshare.title"),
       message: t("shared.unshare.message"),
@@ -129,16 +214,30 @@ async function boot() {
         return;
       }
 
-      // Belum ada server — feedback saja.
-      showToast(t("shared.join.soon"));
-      if (joinSubmit) joinSubmit.disabled = false;
+      if (joinSubmit) joinSubmit.disabled = true;
+      try {
+        const result = await joinSharedNote({
+          noteId,
+          accessCode: code,
+          displayName: name,
+        });
+        sharedNotes = byUpdatedAtDesc(await documentService.listSharedNotes());
+        render();
+        showToast(t("shared.join.submit") + " ✓");
+        const id = (result && result.note && result.note.id) || noteId;
+        window.location.href = "/editor/" + encodeURIComponent(id);
+      } catch (err) {
+        console.error("[shared] join:", err);
+        showToast(err && err.message ? err.message : t("shared.join.soon"));
+      } finally {
+        if (joinSubmit) joinSubmit.disabled = false;
+      }
     });
   }
 
   await load();
 }
 
-/** Init untuk SPA / multi-page. */
 export async function initShared() {
   initI18n();
   return boot();

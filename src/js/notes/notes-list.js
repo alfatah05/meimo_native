@@ -165,6 +165,7 @@ async function boot() {
         rows: [
           { label: t("shared.success.noteId"), value: result.noteId },
           { label: t("shared.success.code"), value: result.accessCode },
+          { label: t("shared.success.link") || "Link", value: result.shareUrl || (location.origin + "/s/" + result.noteId) },
           { label: t("shared.success.ownerKey"), value: result.ownerKey },
         ],
         okLabel: t("shared.success.ok"),

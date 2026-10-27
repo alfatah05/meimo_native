@@ -124,6 +124,10 @@ RewriteRule ^arsip/?$ /index.html [NC,L]
 # 3e3) URL cantik /shared -> SPA shell (tab Shared notes v2).
 RewriteRule ^shared/?$ /index.html [NC,L]
 
+# 3e4) Public join link /s/{noteId} → s.html (Phase 5, no install)
+RewriteRule ^s/([^/]+)/?$ /s.html [NC,L]
+RewriteRule ^s/?$ /shared [R=302,L]
+
 # 3f) URL cantik /font-manager -> isinya disajikan dari font-manager.html
 #     (halaman Font Library / Kelola Font).
 RewriteRule ^font-manager/?$ /index.html [NC,L]

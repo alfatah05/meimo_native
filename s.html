@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<style>
+@view-transition { navigation: auto; }
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Join shared note — Meimo</title>
+<meta name="description" content="Join a shared Meimo note with access code. No install required.">
+<meta name="robots" content="noindex">
+
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1E1E1E">
+<script>
+  (function () {
+    var THEME_COLORS = { light: "#FFFFFF", dark: "#17181C", sepia: "#F4ECD8", paper: "#FBFAF5", oled: "#000000" };
+    try {
+      var t = localStorage.getItem("notes-app-theme");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+      var meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.setAttribute("content", THEME_COLORS[t] || THEME_COLORS.light);
+      var lang = localStorage.getItem("notes-app-lang");
+      if (lang === "id" || lang === "ja" || lang === "en") {
+        document.documentElement.setAttribute("lang", lang);
+      }
+    } catch (e) {}
+  })();
+</script>
+<link rel="icon" href="/assets/icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/css/variables.css">
+<link rel="stylesheet" href="/src/css/themes.css">
+<link rel="stylesheet" href="/src/css/view-transitions.css">
+<link rel="stylesheet" href="/src/css/base.css">
+<link rel="stylesheet" href="/src/css/typography.css">
+<link rel="stylesheet" href="/src/css/layout.css">
+<link rel="stylesheet" href="/src/css/animations.css">
+<link rel="stylesheet" href="/src/css/responsive.css">
+<link rel="stylesheet" href="/src/css/components.css">
+<link rel="stylesheet" href="/src/css/settings.css">
+<style>
+  .join-page { max-width: 420px; margin: 0 auto; padding: var(--space-lg) var(--space-md); }
+  .join-page__brand {
+    font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--color-text-muted); margin-bottom: var(--space-sm);
+  }
+  .join-page__title { font-size: 1.35rem; font-weight: 600; margin: 0 0 var(--space-xs); }
+  .join-page__desc { color: var(--color-text-muted); margin: 0 0 var(--space-lg); line-height: 1.45; }
+  .join-page__note-id {
+    font-family: ui-monospace, monospace; font-size: 0.9rem;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface); border-radius: var(--radius-md);
+    margin-bottom: var(--space-lg); word-break: break-all;
+  }
+  .join-field { margin-bottom: var(--space-md); }
+  .join-field label {
+    display: block; font-size: 0.8rem; color: var(--color-text-muted);
+    margin-bottom: var(--space-xs);
+  }
+  .join-field input {
+    width: 100%; box-sizing: border-box;
+  }
+  .join-submit {
+    width: 100%; margin-top: var(--space-md);
+    display: flex; justify-content: center;
+  }
+  .join-error {
+    color: var(--color-danger, #e25555); font-size: 0.9rem;
+    margin-top: var(--space-sm); min-height: 1.2em;
+  }
+  .join-footer {
+    margin-top: var(--space-xl); text-align: center;
+    font-size: 0.85rem; color: var(--color-text-muted);
+  }
+  .join-footer a { color: var(--color-accent, #6c8cff); }
+</style>
+</head>
+<body>
+<div class="page">
+  <main class="join-page anim-fade-in">
+    <div class="join-page__brand">Meimo</div>
+    <h1 class="join-page__title" data-i18n="joinPublic.title">Join shared note</h1>
+    <p class="join-page__desc" data-i18n="joinPublic.desc">Enter the access code and your name. No install needed — works in the browser.</p>
+
+    <div class="join-page__note-id" id="joinPublicNoteId">—</div>
+
+    <form id="joinPublicForm" autocomplete="on">
+      <div class="join-field">
+        <label for="joinPublicCode" data-i18n="shared.join.code">Access code (8 characters)</label>
+        <input id="joinPublicCode" class="search-bar__input" type="text" maxlength="8"
+          autocapitalize="off" autocomplete="off" spellcheck="false" required />
+      </div>
+      <div class="join-field">
+        <label for="joinPublicName" data-i18n="shared.join.name">Your name (letters only, min 3)</label>
+        <input id="joinPublicName" class="search-bar__input" type="text"
+          autocomplete="name" required />
+      </div>
+      <button type="submit" id="joinPublicSubmit" class="fab-action fab-action--primary join-submit"
+        data-i18n="shared.join.submit">Join</button>
+      <div class="join-error" id="joinPublicError" hidden></div>
+    </form>
+
+    <p class="join-footer">
+      <a href="/library" data-i18n="joinPublic.openApp">Open Meimo</a>
+    </p>
+  </main>
+</div>
+
+<script type="module" src="/src/js/notes/join-public.js"></script>
+</body>
+</html>

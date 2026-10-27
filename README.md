@@ -1,6 +1,6 @@
 # Personal Notes PWA
 
-**Versi: v1.23.51** (lihat [Changelog](#changelog) di bawah untuk riwayat versi)
+**Versi: v2.0.0** (lihat [Changelog](#changelog) di bawah untuk riwayat versi)
 
 Kerangka struktur folder untuk aplikasi PWA pencatatan pribadi (bukan markdown editor),
 dibuat mengikuti `PROJECT_RULES.md`.
@@ -210,6 +210,13 @@ lewat tombol seperti biasa di `cadangkan.html`.
 
 Aturan penomoran versi (SemVer) & checklist sebelum export/zip dipindah
 ke [`AI_RULES.md`](./AI_RULES.md).
+
+### v2.0.0
+- **Shared Notes (online, opsional):** bagikan catatan dengan noteId + access code 8 karakter (case-sensitive); default tetap offline-first.
+- Tab **Shared**, Owner Key per instalasi (unshare / ganti kode), join lewat app atau web `/s/{noteId}` (tanpa install).
+- Kolaborasi: polling 1–3s (adaptif), max 5 user, lock per-block, dual-path local + server (PHP/MySQL shared hosting).
+- Hardening: backup sebelum unshare, heartbeat lock, offline queue, export/import Owner Key.
+- `CACHE_VERSION` -> v147.
 
 ### v1.23.51
 - Ruler virtual (tick jarak tetap 5px, hanya render sekitar viewport) — offset ±9999, radius max 1000, scale 10–500%.

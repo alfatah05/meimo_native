@@ -9,6 +9,7 @@
 
 const HOME_PATHS = new Set(["/", "/library", "/index.html", "/library/"]);
 const EDITOR_RE = /^\/editor(?:\/([^/]+))?\/?$/i;
+const SHARE_JOIN_RE = /^\/s\/([^/]+)\/?$/i;
 
 const STATIC_ROUTES = {
   "/cadangkan": "cadangkan",
@@ -67,6 +68,10 @@ function parseRoute(pathname = window.location.pathname) {
   if (m) {
     return { name: "editor", id: m[1] ? decodeURIComponent(m[1]) : null };
   }
+  const sj = path.match(SHARE_JOIN_RE);
+  if (sj) {
+    return { name: "join", id: sj[1] ? decodeURIComponent(sj[1]) : null };
+  }
   const bare = path.startsWith("/") ? path : `/${path}`;
   if (STATIC_ROUTES[bare]) {
     return { name: STATIC_ROUTES[bare], id: null };
@@ -100,6 +105,8 @@ function pathFor(route) {
       return "/arsip";
     case "shared":
       return "/shared";
+    case "join":
+      return route.id ? `/s/${encodeURIComponent(route.id)}` : "/shared";
     case "settings":
       return "/settings";
     case "fitur-ai":

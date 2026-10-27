@@ -218,6 +218,21 @@ export function createEditorState(initialDocument) {
     keepStyleOnEnter = !!value;
   }
 
+  /**
+   * Ganti seluruh dokumen (dipakai collab remote apply).
+   * silentHistory: tidak push undo stack.
+   */
+  function replaceDocument(nextDoc, { silentHistory = true } = {}) {
+    if (!nextDoc) return;
+    if (!silentHistory) {
+      undoStack.push(cloneDoc(doc));
+      if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+      redoStack.length = 0;
+    }
+    doc = cloneDoc(nextDoc);
+    emitChange({ type: "replaceDocument" });
+  }
+
   function onChange(fn) {
     listeners.add(fn);
     return () => listeners.delete(fn);
@@ -229,6 +244,7 @@ export function createEditorState(initialDocument) {
 
   return {
     getDocument,
+    replaceDocument,
     getBlock,
     updateBlock,
     replaceBlocks,

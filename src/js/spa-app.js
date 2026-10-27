@@ -233,6 +233,12 @@ async function onRoute(route) {
     await ensureSecondary("arsip", "./notes/arsip.js", "initArsip");
     return;
   }
+  if (route.name === "join") {
+    // Multi-page public join — jangan SPA-render
+    const id = route.id ? encodeURIComponent(route.id) : "";
+    window.location.replace(id ? `/s/${id}` : "/shared");
+    return;
+  }
   if (route.name === "shared") {
     await ensureSecondary("shared", "./notes/shared.js", "initShared");
     return;

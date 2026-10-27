@@ -1,6 +1,6 @@
 {
   "name": "meimo",
-  "version": "1.23.51",
+  "version": "2.0.0",
   "description": "Meimo — Catatan Pribadi (Web PWA + Capacitor Native)",
   "main": "index.html",
   "scripts": {
