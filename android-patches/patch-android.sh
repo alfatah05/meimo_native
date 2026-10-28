@@ -7,7 +7,7 @@ cd "$ROOT"
 
 echo "[patch] root=$ROOT"
 
-PKG_DIR="android/app/src/main/java/com/meimo/app"
+PKG_DIR="android/app/src/main/java/com/meimo/app/v2"
 mkdir -p "$PKG_DIR"
 # Hapus package lama jika ada
 rm -rf android/app/src/main/java/com/meimo/notes 2>/dev/null || true
@@ -69,7 +69,7 @@ path = Path("android/app/src/main/AndroidManifest.xml")
 raw = path.read_text(encoding="utf-8").replace("\r\n", "\n")
 
 # Ensure package / applicationId references if present as attribute (legacy)
-raw = raw.replace("com.meimo.notes", "com.meimo.app")
+raw = raw.replace("com.meimo.notes", "com.meimo.app.v2")
 
 REQUIRED = [
     'android.permission.RECORD_AUDIO',
@@ -136,17 +136,17 @@ import re, sys
 from pathlib import Path
 p = Path(sys.argv[1])
 t = p.read_text(encoding="utf-8")
-# applicationId
-t = re.sub(r'applicationId\s+"[^"]+"', 'applicationId "com.meimo.app"', t)
-t = re.sub(r"applicationId\s+'[^']+'", "applicationId 'com.meimo.app'", t)
-t = re.sub(r'namespace\s+"[^"]+"', 'namespace "com.meimo.app"', t)
-t = re.sub(r"namespace\s+'[^']+'", "namespace 'com.meimo.app'", t)
+# applicationId — side-by-side test package on branch v2
+t = re.sub(r'applicationId\s+"[^"]+"', 'applicationId "com.meimo.app.v2"', t)
+t = re.sub(r"applicationId\s+'[^']+'", "applicationId 'com.meimo.app.v2'", t)
+t = re.sub(r'namespace\s+"[^"]+"', 'namespace "com.meimo.app.v2"', t)
+t = re.sub(r"namespace\s+'[^']+'", "namespace 'com.meimo.app.v2'", t)
 # version
 if "versionCode" in t:
-    t = re.sub(r"versionCode\s+\d+", "versionCode 12400", t)
+    t = re.sub(r"versionCode\s+\d+", "versionCode 20000", t)
 if "versionName" in t:
-    t = re.sub(r'versionName\s+"[^"]+"', 'versionName "1.24.0"', t)
-    t = re.sub(r"versionName\s+'[^']+'", "versionName '1.24.0'", t)
+    t = re.sub(r'versionName\s+"[^"]+"', 'versionName "2.0.0-v2"', t)
+    t = re.sub(r"versionName\s+'[^']+'", "versionName '2.0.0-v2'", t)
 p.write_text(t, encoding="utf-8")
 print(f"[patch] gradle appId/version: {p}")
 print([line for line in t.splitlines() if "applicationId" in line or "namespace" in line or "versionCode" in line or "versionName" in line])
