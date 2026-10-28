@@ -47,7 +47,7 @@ export async function shareNoteLocally(note) {
 
   if (sharedApi.isApiConfigured()) {
     // Full document untuk server
-    const full = await documentService.getNote(note.id);
+    const full = await documentService.loadNote(note.id);
     const doc = full || note;
     try {
       const res = await sharedApi.apiShare({
@@ -176,7 +176,7 @@ export async function joinSharedNote({ noteId, accessCode, displayName }) {
 
   await documentService.saveNote(toSave);
   await documentService.markNoteShared(localId, toSave.metadata.sharedMeta);
-  const saved = await documentService.getNote(localId);
+  const saved = await documentService.loadNote(localId);
   return { note: saved, sessionToken: res.sessionToken, version: res.version };
 }
 
