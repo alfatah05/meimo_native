@@ -1,4 +1,4 @@
-package com.meimo.app;
+package com.meimo.app.v2;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;
