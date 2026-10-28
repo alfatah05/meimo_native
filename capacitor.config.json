@@ -1,6 +1,6 @@
 {
-  "appId": "com.meimo.app",
-  "appName": "Meimo",
+  "appId": "com.meimo.app.v2",
+  "appName": "Meimo v2",
   "webDir": "www",
   "server": {
     "androidScheme": "https"
