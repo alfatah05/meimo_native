@@ -1,4 +1,4 @@
-package com.meimo.app;
+package com.meimo.app.v2;
 
 import android.os.Bundle;
 import android.view.View;
