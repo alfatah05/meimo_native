@@ -1,28 +1,67 @@
 /**
  * shared-api.js — client Meimo Shared Notes API (Phase 3–5).
- * Base URL: localStorage `meimo-shared-api`, atau same-origin `/api`.
+ *
+ * Base URL (prioritas):
+ *  1. localStorage `meimo-shared-api`  (wajib di app native / Capacitor)
+ *  2. DEFAULT_BASE hardcode (opsional)
+ *  3. same-origin `/api` HANYA di web http(s) non-localhost
+ *
+ * Di APK, origin sering `https://localhost` → jangan auto-pakai.
  */
 
-const DEFAULT_BASE = "";
+const DEFAULT_BASE = ""; // mis. "https://meimo.example.com/api"
 const LS_KEY = "meimo-shared-api";
+
+function isNativeApp() {
+  try {
+    const c = typeof window !== "undefined" ? window.Capacitor : null;
+    return !!(c && typeof c.isNativePlatform === "function" && c.isNativePlatform());
+  } catch (_) {
+    return false;
+  }
+}
+
+function isLocalLikeHost(hostname) {
+  const h = (hostname || "").toLowerCase();
+  return (
+    !h ||
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h.endsWith(".local") ||
+    h === "android" ||
+    h.includes("capacitor")
+  );
+}
 
 export function getApiBase() {
   try {
     const v = localStorage.getItem(LS_KEY);
-    if (v && /^https?:\/\//i.test(v)) return v.replace(/\/+$/, "");
+    if (v && /^https?:\/\//i.test(v.trim())) return v.trim().replace(/\/+$/, "");
   } catch (_) {}
+
   if (DEFAULT_BASE) return DEFAULT_BASE.replace(/\/+$/, "");
-  // Phase 5: default same-origin (web deploy + api/ di hosting yang sama)
+
+  // Web only: same-origin /api
   try {
-    if (typeof window !== "undefined" && window.location && window.location.origin) {
-      return `${window.location.origin}/api`;
-    }
+    if (isNativeApp()) return "";
+    if (typeof window === "undefined" || !window.location) return "";
+    const { protocol, hostname, origin } = window.location;
+    if (!/^https?:$/i.test(protocol.replace(":", ""))) return "";
+    if (isLocalLikeHost(hostname)) return "";
+    return `${origin}/api`;
   } catch (_) {}
   return "";
 }
 
 export function setApiBase(url) {
-  localStorage.setItem(LS_KEY, (url || "").replace(/\/+$/, ""));
+  const cleaned = (url || "").trim().replace(/\/+$/, "");
+  if (!cleaned) {
+    try {
+      localStorage.removeItem(LS_KEY);
+    } catch (_) {}
+    return;
+  }
+  localStorage.setItem(LS_KEY, cleaned);
 }
 
 export function isApiConfigured() {
@@ -31,7 +70,11 @@ export function isApiConfigured() {
 
 async function request(action, { method = "GET", body, sessionToken, query } = {}) {
   const base = getApiBase();
-  if (!base) throw new Error("Shared API belum dikonfigurasi (setApiBase).");
+  if (!base) {
+    throw new Error(
+      "Shared API belum dikonfigurasi. Set localStorage meimo-shared-api ke https://domain.com/api"
+    );
+  }
 
   const q = new URLSearchParams({ action, ...(query || {}) });
   const url = `${base}/index.php?${q.toString()}`;
@@ -39,23 +82,42 @@ async function request(action, { method = "GET", body, sessionToken, query } = {
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (sessionToken) headers["X-Session-Token"] = sessionToken;
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    credentials: "omit",
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: "omit",
+    });
+  } catch (e) {
+    const err = new Error(
+      `API ${action} network error: ${(e && e.message) || e} (url: ${url})`
+    );
+    err.cause = e;
+    throw err;
+  }
 
+  const text = await res.text();
   let data = null;
   try {
-    data = await res.json();
+    data = text ? JSON.parse(text) : null;
   } catch (_) {
-    throw new Error(`API ${action} non-JSON (${res.status})`);
+    const snippet = (text || "").replace(/\s+/g, " ").slice(0, 120);
+    const err = new Error(
+      `API ${action} non-JSON (${res.status}). Cek URL API & config.php. Body: ${snippet || "(empty)"}`
+    );
+    err.status = res.status;
+    err.url = url;
+    err.bodyText = text;
+    throw err;
   }
+
   if (!res.ok || data?.ok === false) {
     const err = new Error(data?.error || `API ${action} failed (${res.status})`);
     err.status = res.status;
     err.payload = data;
+    err.url = url;
     throw err;
   }
   return data;
@@ -153,12 +215,20 @@ export function startPolling({ noteId, sessionToken, intervalMs = 2000, onUpdate
   };
 }
 
-/** Public join link for a note id */
+/** Public join link for a note id (web origin; native needs real domain in setApiBase) */
 export function buildShareJoinUrl(noteId) {
   try {
-    const origin = window.location.origin;
-    return `${origin}/s/${encodeURIComponent(noteId)}`;
-  } catch (_) {
-    return `/s/${encodeURIComponent(noteId)}`;
-  }
+    const base = getApiBase();
+    if (base) {
+      // https://domain.com/api → https://domain.com/s/...
+      const origin = base.replace(/\/api\/?$/, "");
+      if (/^https?:\/\//i.test(origin)) {
+        return `${origin}/s/${encodeURIComponent(noteId)}`;
+      }
+    }
+    if (typeof window !== "undefined" && window.location && !isLocalLikeHost(window.location.hostname)) {
+      return `${window.location.origin}/s/${encodeURIComponent(noteId)}`;
+    }
+  } catch (_) {}
+  return `/s/${encodeURIComponent(noteId)}`;
 }
