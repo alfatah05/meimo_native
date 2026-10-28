@@ -1,4 +1,4 @@
-package com.meimo.app;
+package com.meimo.app.v2;
 
 import android.graphics.Color;
 import android.os.Build;

@@ -1,4 +1,4 @@
-package com.meimo.app;
+package com.meimo.app.v2;
 
 import android.Manifest;
 import com.getcapacitor.JSObject;
