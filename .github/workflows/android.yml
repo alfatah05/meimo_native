@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, v2]
   workflow_dispatch:
 
 jobs:
@@ -65,7 +65,7 @@ jobs:
       - name: Verify package + mic + icons present
         run: |
           grep -n "RECORD_AUDIO" android/app/src/main/AndroidManifest.xml
-          test -f android/app/src/main/java/com/meimo/app/MainActivity.java
+          test -f android/app/src/main/java/com/meimo/app/v2/MainActivity.java
           # Icon harus ada (dari capacitor-assets)
           find android/app/src/main/res -name "ic_launcher.png" | head -5
           echo "VERIFY OK"
@@ -100,7 +100,8 @@ jobs:
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: meimo-release-apk
+          # Branch v2 = side-by-side test package (com.meimo.app.v2)
+          name: meimo-v2-test-apk
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
           if-no-files-found: error
